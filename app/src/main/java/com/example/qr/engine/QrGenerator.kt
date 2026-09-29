@@ -301,9 +301,60 @@ object QrGenerator {
         }
 
         // 5. Draw QR Modules (Skip Finders)
-        val gap = cellSize * qrStyle.moduleGap.coerceIn(0f, 0.15f)
-        val dotScale = qrStyle.dotScale.coerceIn(0.55f, 1.0f)
+        val hasEffect = qrStyle.effect != QrEffect.None
+        val rawGap = cellSize * qrStyle.moduleGap.coerceIn(0f, 0.15f)
+        val gap = if (hasEffect) Math.max(rawGap, cellSize * 0.05f) else rawGap
+        val rawScale = qrStyle.dotScale.coerceIn(0.55f, 1.0f)
+        val dotScale = if (hasEffect) Math.min(rawScale, 0.94f) else rawScale
+        val effCol = resolveVibrantEffectColor(qrStyle)
 
+        // PASS 1 (If Effect Active): Continuous Depth Underlay (Cast Shadows, Cavity Carving, Ambient Glow Halos)
+        if (hasEffect) {
+            // 1.1 Finder Eyes Underlay Shadows
+            drawEyeUnderlay(canvas, originX, originY, cellSize, qrStyle, effCol)
+            drawEyeUnderlay(canvas, originX + (matrixSize - 7) * cellSize, originY, cellSize, qrStyle, effCol)
+            drawEyeUnderlay(canvas, originX, originY + (matrixSize - 7) * cellSize, cellSize, qrStyle, effCol)
+
+            // 1.2 Module Grid Underlay
+            for (y in 0 until matrixSize) {
+                for (x in 0 until matrixSize) {
+                    if (isFinderCell(x, y, matrixSize)) continue
+                    if (centerZone != null && centerZone.contains(x, y)) continue
+                    if (matrix.get(x, y).toInt() != 1) continue
+
+                    val cellLeft = originX + x * cellSize
+                    val cellTop = originY + y * cellSize
+                    val cx = cellLeft + cellSize / 2f
+                    val cy = cellTop + cellSize / 2f
+                    val activeSize = (cellSize - gap * 2) * dotScale
+
+                    val nDark = y > 0 && matrix.get(x, y - 1).toInt() == 1
+                    val sDark = y < matrixSize - 1 && matrix.get(x, y + 1).toInt() == 1
+                    val wDark = x > 0 && matrix.get(x - 1, y).toInt() == 1
+                    val eDark = x < matrixSize - 1 && matrix.get(x + 1, y).toInt() == 1
+
+                    drawModuleUnderlay(
+                        canvas = canvas,
+                        shape = qrStyle.moduleShape,
+                        cx = cx,
+                        cy = cy,
+                        size = activeSize,
+                        gx = x,
+                        gy = y,
+                        nDark = nDark,
+                        sDark = sDark,
+                        wDark = wDark,
+                        eDark = eDark,
+                        matrixSize = matrixSize,
+                        effect = qrStyle.effect,
+                        effectColor = effCol,
+                        intensity = qrStyle.effectIntensity
+                    )
+                }
+            }
+        }
+
+        // PASS 2: Module Surfaces, 3D Pedestals, Tactile Bevels, Illuminated Rims & High-Contrast Cores
         for (y in 0 until matrixSize) {
             for (x in 0 until matrixSize) {
                 if (isFinderCell(x, y, matrixSize)) continue
@@ -355,9 +406,8 @@ object QrGenerator {
                             modulePaint.color = android.graphics.Color.rgb(v, v, v)
                         }
                         ImageMode.Paint -> {
-                            // Guaranteed center core dot in deep ink for camera decode
                             val coreSize = activeSize * (1f - qrStyle.artisticStrength * 0.45f).coerceIn(0.65f, 0.95f)
-                            drawModuleShape(
+                            drawModuleSurface(
                                 canvas = canvas,
                                 shape = qrStyle.moduleShape,
                                 cx = cx,
@@ -365,7 +415,10 @@ object QrGenerator {
                                 size = coreSize,
                                 paint = modulePaint,
                                 gx = x,
-                                gy = y
+                                gy = y,
+                                effect = qrStyle.effect,
+                                effectColor = effCol,
+                                intensity = qrStyle.effectIntensity
                             )
                             continue
                         }
@@ -378,7 +431,7 @@ object QrGenerator {
                 val wDark = x > 0 && matrix.get(x - 1, y).toInt() == 1
                 val eDark = x < matrixSize - 1 && matrix.get(x + 1, y).toInt() == 1
 
-                drawModuleShape(
+                drawModuleSurface(
                     canvas = canvas,
                     shape = qrStyle.moduleShape,
                     cx = cx,
@@ -391,15 +444,18 @@ object QrGenerator {
                     sDark = sDark,
                     wDark = wDark,
                     eDark = eDark,
-                    matrixSize = matrixSize
+                    matrixSize = matrixSize,
+                    effect = qrStyle.effect,
+                    effectColor = effCol,
+                    intensity = qrStyle.effectIntensity
                 )
             }
         }
 
         // 6. Draw The 3 Finder Eyes (Top-Left, Top-Right, Bottom-Left)
-        drawEye(canvas, originX, originY, cellSize, qrStyle)
-        drawEye(canvas, originX + (matrixSize - 7) * cellSize, originY, cellSize, qrStyle)
-        drawEye(canvas, originX, originY + (matrixSize - 7) * cellSize, cellSize, qrStyle)
+        drawEye(canvas, originX, originY, cellSize, qrStyle, effCol)
+        drawEye(canvas, originX + (matrixSize - 7) * cellSize, originY, cellSize, qrStyle, effCol)
+        drawEye(canvas, originX, originY + (matrixSize - 7) * cellSize, cellSize, qrStyle, effCol)
 
         // 7. Render Border Artistic Decorations if configured
         drawArtisticBorderDecorations(canvas, qrStyle.artDirection, sizePx, originX, originY, bodyW, qrStyle)
@@ -514,6 +570,30 @@ object QrGenerator {
                 append("      <stop offset=\"100%\" stop-color=\"$gradHex\" />\n")
                 append("    </radialGradient>\n")
             }
+
+            // SVG Effects Filters
+            when (qrStyle.effect) {
+                QrEffect.Raised3D, QrEffect.Shadow -> {
+                    append("    <filter id=\"qrEffectFilter\" x=\"-20%\" y=\"-20%\" width=\"140%\" height=\"140%\">\n")
+                    append("      <feDropShadow dx=\"2.5\" dy=\"2.5\" stdDeviation=\"1.8\" flood-color=\"#000000\" flood-opacity=\"0.45\" />\n")
+                    append("    </filter>\n")
+                }
+                QrEffect.Engraved -> {
+                    append("    <filter id=\"qrEffectFilter\" x=\"-20%\" y=\"-20%\" width=\"140%\" height=\"140%\">\n")
+                    append("      <feDropShadow dx=\"-1.5\" dy=\"-1.5\" stdDeviation=\"1\" flood-color=\"#000000\" flood-opacity=\"0.55\" />\n")
+                    append("    </filter>\n")
+                }
+                QrEffect.Glow -> {
+                    append("    <filter id=\"qrEffectFilter\" x=\"-30%\" y=\"-30%\" width=\"160%\" height=\"160%\">\n")
+                    append("      <feGaussianBlur stdDeviation=\"3.5\" result=\"coloredBlur\"/>\n")
+                    append("      <feMerge>\n")
+                    append("        <feMergeNode in=\"coloredBlur\"/>\n")
+                    append("        <feMergeNode in=\"SourceGraphic\"/>\n")
+                    append("      </feMerge>\n")
+                    append("    </filter>\n")
+                }
+                else -> {}
+            }
             append("  </defs>\n")
 
             // Background
@@ -522,7 +602,9 @@ object QrGenerator {
             }
 
             // QR Modules
-            append("  <g fill=\"$fillAttr\">\n")
+            val filterAttr = if (qrStyle.effect != QrEffect.None && qrStyle.effect != QrEffect.Outline) " filter=\"url(#qrEffectFilter)\"" else ""
+            val strokeAttr = if (qrStyle.effect == QrEffect.Outline) " stroke=\"#FFFFFF\" stroke-width=\"1.5\"" else ""
+            append("  <g fill=\"$fillAttr\"$filterAttr$strokeAttr>\n")
             for (y in 0 until matrixSize) {
                 for (x in 0 until matrixSize) {
                     if (isFinderCell(x, y, matrixSize)) continue
@@ -711,7 +793,346 @@ object QrGenerator {
         canvas.drawBitmap(logo, Rect(0, 0, logo.width, logo.height), destRect, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
     }
 
+    fun resolveVibrantEffectColor(qrStyle: QrStyle): Int {
+        val baseCol = if (qrStyle.gradientType != GradientType.None) qrStyle.gradientTo else qrStyle.fgColor
+        val r = (baseCol shr 16) and 0xFF
+        val g = (baseCol shr 8) and 0xFF
+        val b = baseCol and 0xFF
+        val luma = (0.299f * r + 0.587f * g + 0.114f * b) / 255f
+        return if (luma >= 0.35f) {
+            baseCol
+        } else {
+            if (qrStyle.eyeColor != qrStyle.fgColor && !isDarkColor(qrStyle.eyeColor)) {
+                qrStyle.eyeColor
+            } else {
+                0xFF00E5FF.toInt() // Vibrant Electric Cyan
+            }
+        }
+    }
+
+    private fun drawModuleUnderlay(
+        canvas: Canvas,
+        shape: ModuleShape,
+        cx: Float,
+        cy: Float,
+        size: Float,
+        gx: Int,
+        gy: Int,
+        nDark: Boolean = false,
+        sDark: Boolean = false,
+        wDark: Boolean = false,
+        eDark: Boolean = false,
+        matrixSize: Int = 33,
+        effect: QrEffect = QrEffect.None,
+        effectColor: Int = 0,
+        intensity: Float = 1.0f
+    ) {
+        val safeIntensity = intensity.coerceIn(0.4f, 2.5f)
+        when (effect) {
+            QrEffect.None -> {}
+            QrEffect.Raised3D -> {
+                val sDist = (size * 0.22f * safeIntensity).coerceIn(3.0f, 18f)
+
+                // 1. Soft wide ambient cast shadow
+                val ambPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0x38000000
+                    style = Paint.Style.FILL
+                }
+                drawRawModuleShape(canvas, shape, cx + sDist * 1.4f, cy + sDist * 1.4f, size * 1.12f, ambPaint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+
+                // 2. Crisp 3D contact drop shadow
+                val contactPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0x75000000
+                    style = Paint.Style.FILL
+                }
+                drawRawModuleShape(canvas, shape, cx + sDist, cy + sDist, size * 1.0f, contactPaint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+            }
+            QrEffect.Engraved -> {
+                val inDist = (size * 0.18f * safeIntensity).coerceIn(2.5f, 15f)
+
+                // 1. Deep carved cavity shadow top-left
+                val pitPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0xAA000000.toInt()
+                    style = Paint.Style.FILL
+                }
+                drawRawModuleShape(canvas, shape, cx - inDist * 1.1f, cy - inDist * 1.1f, size * 1.08f, pitPaint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+
+                // 2. Chiseled lip reflection bottom-right
+                val chiselPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0xAAFFFFFF.toInt()
+                    style = Paint.Style.FILL
+                }
+                drawRawModuleShape(canvas, shape, cx + inDist * 1.1f, cy + inDist * 1.1f, size * 1.08f, chiselPaint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+            }
+            QrEffect.Glow -> {
+                val glowCol = if (effectColor != 0) effectColor else 0xFF00F0FF.toInt()
+                val bloom = (size * 0.40f * safeIntensity).coerceIn(5f, 32f)
+
+                // 1. Wide atmospheric neon aura
+                val outerHalo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = (glowCol and 0x00FFFFFF) or 0x25000000
+                    style = Paint.Style.FILL
+                }
+                drawRawModuleShape(canvas, shape, cx, cy, size + bloom * 2.2f, outerHalo, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+
+                // 2. Concentrated neon corona
+                val midHalo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = (glowCol and 0x00FFFFFF) or 0x60000000
+                    style = Paint.Style.FILL
+                }
+                drawRawModuleShape(canvas, shape, cx, cy, size + bloom * 1.2f, midHalo, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+
+                // 3. Intense edge aura
+                val edgeHalo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = (glowCol and 0x00FFFFFF) or 0x95000000.toInt()
+                    style = Paint.Style.FILL
+                }
+                drawRawModuleShape(canvas, shape, cx, cy, size + bloom * 0.5f, edgeHalo, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+            }
+            QrEffect.Shadow -> {
+                val sDist = (size * 0.22f * safeIntensity).coerceIn(3.5f, 20f)
+                val ambPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0x32000000
+                    style = Paint.Style.FILL
+                }
+                drawRawModuleShape(canvas, shape, cx + sDist * 1.6f, cy + sDist * 1.6f, size * 1.14f, ambPaint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+
+                val contactPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0x70000000
+                    style = Paint.Style.FILL
+                }
+                drawRawModuleShape(canvas, shape, cx + sDist, cy + sDist, size * 1.0f, contactPaint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+            }
+            QrEffect.Emboss -> {
+                val eDist = (size * 0.16f * safeIntensity).coerceIn(2.5f, 15f)
+                val hlPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0xAAFFFFFF.toInt()
+                    style = Paint.Style.FILL
+                }
+                drawRawModuleShape(canvas, shape, cx - eDist * 1.2f, cy - eDist * 1.2f, size * 1.04f, hlPaint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+
+                val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0x88000000.toInt()
+                    style = Paint.Style.FILL
+                }
+                drawRawModuleShape(canvas, shape, cx + eDist * 1.2f, cy + eDist * 1.2f, size * 1.04f, shadowPaint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+            }
+            QrEffect.Outline -> {
+                val strokeW = (size * 0.18f * safeIntensity).coerceIn(3f, 9f)
+                val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0xEEFFFFFF.toInt()
+                    style = Paint.Style.STROKE
+                    strokeWidth = strokeW
+                }
+                drawRawModuleShape(canvas, shape, cx, cy, size * 1.02f, outlinePaint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+            }
+            QrEffect.Glassmorphism -> {
+                val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0x45000000
+                    style = Paint.Style.FILL
+                }
+                drawRawModuleShape(canvas, shape, cx + size * 0.12f, cy + size * 0.12f, size * 1.05f, shadowPaint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+            }
+        }
+    }
+
+    private fun drawModuleSurface(
+        canvas: Canvas,
+        shape: ModuleShape,
+        cx: Float,
+        cy: Float,
+        size: Float,
+        paint: Paint,
+        gx: Int,
+        gy: Int,
+        nDark: Boolean = false,
+        sDark: Boolean = false,
+        wDark: Boolean = false,
+        eDark: Boolean = false,
+        matrixSize: Int = 33,
+        effect: QrEffect = QrEffect.None,
+        effectColor: Int = 0,
+        intensity: Float = 1.0f
+    ) {
+        val safeIntensity = intensity.coerceIn(0.4f, 2.5f)
+        when (effect) {
+            QrEffect.None -> {
+                drawRawModuleShape(canvas, shape, cx, cy, size, paint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+            }
+            QrEffect.Raised3D -> {
+                val sDist = (size * 0.22f * safeIntensity).coerceIn(3.0f, 18f)
+
+                // 1. Extruded 3D Sidewall Pedestal (physical block thickness between shadow and face)
+                val sidewallPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0x65000000
+                    style = Paint.Style.FILL
+                }
+                drawRawModuleShape(canvas, shape, cx + sDist * 0.45f, cy + sDist * 0.45f, size, sidewallPaint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+
+                // 2. Elevated Top Face
+                val faceX = cx - sDist * 0.22f
+                val faceY = cy - sDist * 0.22f
+                drawRawModuleShape(canvas, shape, faceX, faceY, size, paint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+
+                // 3. Specular Top-Left Illuminated Bevel Crest (Crisp directional light reflection)
+                val bevelStrokeW = (size * 0.14f).coerceIn(1.8f, 4.0f)
+                val hlStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0xCCFFFFFF.toInt()
+                    style = Paint.Style.STROKE
+                    strokeWidth = bevelStrokeW
+                }
+                drawRawModuleShape(canvas, shape, faceX - sDist * 0.35f, faceY - sDist * 0.35f, size * 0.94f, hlStrokePaint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+
+                // 4. Bottom-Right Deep Shaded Bevel Contour (Defines 3D rounded button geometry)
+                val shadeStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0x75000000
+                    style = Paint.Style.STROKE
+                    strokeWidth = bevelStrokeW
+                }
+                drawRawModuleShape(canvas, shape, faceX + sDist * 0.25f, faceY + sDist * 0.25f, size * 0.94f, shadeStrokePaint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+
+                // 5. Guaranteed Optical Center Core for instantaneous mobile scanner decode
+                drawRawModuleShape(canvas, shape, cx, cy, size * 0.70f, paint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+            }
+            QrEffect.Engraved -> {
+                val inDist = (size * 0.18f * safeIntensity).coerceIn(2.5f, 15f)
+
+                // 1. Recessed Sunken Floor (Pushed down-right into cavity)
+                val floorX = cx + inDist * 0.25f
+                val floorY = cy + inDist * 0.25f
+                drawRawModuleShape(canvas, shape, floorX, floorY, size * 0.86f, paint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+
+                // 2. Inner cavity top-left shadow rim
+                val strokeW = (size * 0.14f).coerceIn(1.8f, 3.8f)
+                val innerRimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0x75000000
+                    style = Paint.Style.STROKE
+                    strokeWidth = strokeW
+                }
+                drawRawModuleShape(canvas, shape, floorX - inDist * 0.25f, floorY - inDist * 0.25f, size * 0.86f, innerRimPaint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+
+                // 3. High-contrast sunken core
+                drawRawModuleShape(canvas, shape, floorX, floorY, size * 0.65f, paint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+            }
+            QrEffect.Glow -> {
+                val glowCol = if (effectColor != 0) effectColor else 0xFF00F0FF.toInt()
+
+                // 1. High-contrast solid module body
+                drawRawModuleShape(canvas, shape, cx, cy, size, paint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+
+                // 2. Electric neon edge ring
+                val neonEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = (glowCol and 0x00FFFFFF) or 0xDD000000.toInt()
+                    style = Paint.Style.STROKE
+                    strokeWidth = (size * 0.14f).coerceIn(1.8f, 3.8f)
+                }
+                drawRawModuleShape(canvas, shape, cx, cy, size * 0.96f, neonEdgePaint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+
+                // 3. Specular laser core pip
+                val laserPip = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0xEEFFFFFF.toInt()
+                    style = Paint.Style.FILL
+                }
+                drawRawModuleShape(canvas, shape, cx, cy, size * 0.30f, laserPip, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+            }
+            QrEffect.Shadow -> {
+                val sDist = (size * 0.22f * safeIntensity).coerceIn(3.5f, 20f)
+
+                // Floating module body
+                drawRawModuleShape(canvas, shape, cx, cy, size, paint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+
+                // Subtle bottom-right edge separator
+                val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0x50000000
+                    style = Paint.Style.STROKE
+                    strokeWidth = (size * 0.10f).coerceIn(1.5f, 3.0f)
+                }
+                drawRawModuleShape(canvas, shape, cx + sDist * 0.2f, cy + sDist * 0.2f, size * 0.96f, edgePaint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+            }
+            QrEffect.Emboss -> {
+                val eDist = (size * 0.16f * safeIntensity).coerceIn(2.5f, 15f)
+
+                // Stamped core
+                drawRawModuleShape(canvas, shape, cx, cy, size * 0.88f, paint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+
+                // Stamped crest & groove strokes
+                val strokeW = (size * 0.12f).coerceIn(1.5f, 3.5f)
+                val crestPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0xAAFFFFFF.toInt()
+                    style = Paint.Style.STROKE
+                    strokeWidth = strokeW
+                }
+                drawRawModuleShape(canvas, shape, cx - eDist * 0.5f, cy - eDist * 0.5f, size * 0.88f, crestPaint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+
+                val groovePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0x80000000.toInt()
+                    style = Paint.Style.STROKE
+                    strokeWidth = strokeW
+                }
+                drawRawModuleShape(canvas, shape, cx + eDist * 0.5f, cy + eDist * 0.5f, size * 0.88f, groovePaint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+            }
+            QrEffect.Outline -> {
+                // Inner dark boundary
+                val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0x99000000.toInt()
+                    style = Paint.Style.STROKE
+                    strokeWidth = 2.0f
+                }
+                drawRawModuleShape(canvas, shape, cx, cy, size * 0.96f, innerPaint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+
+                // Solid core
+                drawRawModuleShape(canvas, shape, cx, cy, size * 0.84f, paint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+            }
+            QrEffect.Glassmorphism -> {
+                // Glass body
+                drawRawModuleShape(canvas, shape, cx, cy, size, paint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+
+                // Upper specular gloss sheen
+                val glossPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0x90FFFFFF.toInt()
+                    style = Paint.Style.FILL
+                }
+                drawRawModuleShape(canvas, shape, cx - size * 0.08f, cy - size * 0.18f, size * 0.65f, glossPaint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+
+                // Glass refractive rim
+                val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0x70FFFFFF.toInt()
+                    style = Paint.Style.STROKE
+                    strokeWidth = 1.8f
+                }
+                drawRawModuleShape(canvas, shape, cx, cy, size, rimPaint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+
+                // Optical core pip
+                drawRawModuleShape(canvas, shape, cx, cy, size * 0.40f, paint, gx, gy, nDark, sDark, wDark, eDark, matrixSize)
+            }
+        }
+    }
+
     private fun drawModuleShape(
+        canvas: Canvas,
+        shape: ModuleShape,
+        cx: Float,
+        cy: Float,
+        size: Float,
+        paint: Paint,
+        gx: Int,
+        gy: Int,
+        nDark: Boolean = false,
+        sDark: Boolean = false,
+        wDark: Boolean = false,
+        eDark: Boolean = false,
+        matrixSize: Int = 33,
+        effect: QrEffect = QrEffect.None,
+        effectColor: Int = 0,
+        intensity: Float = 1.0f
+    ) {
+        if (effect != QrEffect.None) {
+            drawModuleUnderlay(canvas, shape, cx, cy, size, gx, gy, nDark, sDark, wDark, eDark, matrixSize, effect, effectColor, intensity)
+        }
+        drawModuleSurface(canvas, shape, cx, cy, size, paint, gx, gy, nDark, sDark, wDark, eDark, matrixSize, effect, effectColor, intensity)
+    }
+
+    private fun drawRawModuleShape(
         canvas: Canvas,
         shape: ModuleShape,
         cx: Float,
@@ -943,7 +1364,89 @@ object QrGenerator {
         return (lighter + 0.05f) / (darker + 0.05f)
     }
 
-    private fun drawEye(canvas: Canvas, ox: Float, oy: Float, cell: Float, qrStyle: QrStyle) {
+    private fun drawEyeUnderlay(canvas: Canvas, ox: Float, oy: Float, cell: Float, qrStyle: QrStyle, effCol: Int = 0) {
+        val s = cell * 7
+        val bx = ox + cell * 2
+        val by = oy + cell * 2
+        val bSize = cell * 3
+        val eyeIntensity = qrStyle.effectIntensity.coerceIn(0.4f, 2.5f)
+
+        when (qrStyle.effect) {
+            QrEffect.None -> {}
+            QrEffect.Raised3D -> {
+                val sDist = (cell * 0.42f * eyeIntensity).coerceIn(3.5f, 22f)
+                val ambPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x38000000; style = Paint.Style.FILL }
+                val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x75000000; style = Paint.Style.FILL }
+
+                drawEyeLayer(canvas, ox + sDist * 1.4f, oy + sDist * 1.4f, s * 1.05f, qrStyle.eyeShape, ambPaint)
+                drawEyeLayer(canvas, ox + sDist, oy + sDist, s, qrStyle.eyeShape, shadowPaint)
+
+                drawEyeLayer(canvas, bx + sDist * 1.25f, by + sDist * 1.25f, bSize * 1.06f, qrStyle.ballShape, ambPaint)
+                drawEyeLayer(canvas, bx + sDist * 0.9f, by + sDist * 0.9f, bSize, qrStyle.ballShape, shadowPaint)
+            }
+            QrEffect.Engraved -> {
+                val inDist = (cell * 0.36f * eyeIntensity).coerceIn(3.0f, 18f)
+                val pitPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xAA000000.toInt(); style = Paint.Style.FILL }
+                val chiselPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xBBFFFFFF.toInt(); style = Paint.Style.FILL }
+
+                drawEyeLayer(canvas, ox - inDist * 1.1f, oy - inDist * 1.1f, s * 1.05f, qrStyle.eyeShape, pitPaint)
+                drawEyeLayer(canvas, ox + inDist * 1.1f, oy + inDist * 1.1f, s * 1.05f, qrStyle.eyeShape, chiselPaint)
+
+                drawEyeLayer(canvas, bx - inDist, by - inDist, bSize * 1.06f, qrStyle.ballShape, pitPaint)
+                drawEyeLayer(canvas, bx + inDist, by + inDist, bSize * 1.06f, qrStyle.ballShape, chiselPaint)
+            }
+            QrEffect.Glow -> {
+                val bloom = (cell * 0.50f * eyeIntensity).coerceIn(5f, 30f)
+                val halo1 = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = (effCol and 0x00FFFFFF) or 0x25000000; style = Paint.Style.FILL }
+                val halo2 = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = (effCol and 0x00FFFFFF) or 0x65000000; style = Paint.Style.FILL }
+
+                drawEyeLayer(canvas, ox - bloom * 1.8f, oy - bloom * 1.8f, s + bloom * 3.6f, qrStyle.eyeShape, halo1)
+                drawEyeLayer(canvas, ox - bloom * 0.9f, oy - bloom * 0.9f, s + bloom * 1.8f, qrStyle.eyeShape, halo2)
+
+                drawEyeLayer(canvas, bx - bloom * 1.2f, by - bloom * 1.2f, bSize + bloom * 2.4f, qrStyle.ballShape, halo1)
+                drawEyeLayer(canvas, bx - bloom * 0.6f, by - bloom * 0.6f, bSize + bloom * 1.2f, qrStyle.ballShape, halo2)
+            }
+            QrEffect.Shadow -> {
+                val sDist = (cell * 0.40f * eyeIntensity).coerceIn(3.5f, 20f)
+                val ambPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x30000000; style = Paint.Style.FILL }
+                val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x70000000; style = Paint.Style.FILL }
+
+                drawEyeLayer(canvas, ox + sDist * 1.5f, oy + sDist * 1.5f, s * 1.06f, qrStyle.eyeShape, ambPaint)
+                drawEyeLayer(canvas, ox + sDist, oy + sDist, s, qrStyle.eyeShape, shadowPaint)
+
+                drawEyeLayer(canvas, bx + sDist * 1.3f, by + sDist * 1.3f, bSize * 1.06f, qrStyle.ballShape, ambPaint)
+                drawEyeLayer(canvas, bx + sDist * 0.9f, by + sDist * 0.9f, bSize, qrStyle.ballShape, shadowPaint)
+            }
+            QrEffect.Emboss -> {
+                val eDist = (cell * 0.32f * eyeIntensity).coerceIn(3.0f, 16f)
+                val hlPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xAAFFFFFF.toInt(); style = Paint.Style.FILL }
+                val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x88000000.toInt(); style = Paint.Style.FILL }
+
+                drawEyeLayer(canvas, ox - eDist * 1.1f, oy - eDist * 1.1f, s * 1.02f, qrStyle.eyeShape, hlPaint)
+                drawEyeLayer(canvas, ox + eDist * 1.1f, oy + eDist * 1.1f, s * 1.02f, qrStyle.eyeShape, shadowPaint)
+
+                drawEyeLayer(canvas, bx - eDist * 0.8f, by - eDist * 0.8f, bSize * 1.02f, qrStyle.ballShape, hlPaint)
+                drawEyeLayer(canvas, bx + eDist * 0.8f, by + eDist * 0.8f, bSize * 1.02f, qrStyle.ballShape, shadowPaint)
+            }
+            QrEffect.Outline -> {
+                val strokeW = (cell * 0.38f * eyeIntensity).coerceIn(3f, 10f)
+                val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0xEEFFFFFF.toInt()
+                    style = Paint.Style.STROKE
+                    strokeWidth = strokeW
+                }
+                drawEyeLayer(canvas, ox, oy, s, qrStyle.eyeShape, outlinePaint)
+                drawEyeLayer(canvas, bx, by, bSize, qrStyle.ballShape, outlinePaint)
+            }
+            QrEffect.Glassmorphism -> {
+                val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x45000000; style = Paint.Style.FILL }
+                drawEyeLayer(canvas, ox + cell * 0.25f, oy + cell * 0.25f, s * 1.03f, qrStyle.eyeShape, shadowPaint)
+                drawEyeLayer(canvas, bx + cell * 0.2f, by + cell * 0.2f, bSize * 1.03f, qrStyle.ballShape, shadowPaint)
+            }
+        }
+    }
+
+    private fun drawEye(canvas: Canvas, ox: Float, oy: Float, cell: Float, qrStyle: QrStyle, effCol: Int = 0) {
         val s = cell * 7
         val (eyeColor, ballColor) = resolveEffectiveEyeColors(qrStyle)
         val bgColor = qrStyle.bgColor
@@ -973,17 +1476,136 @@ object QrGenerator {
             this.style = Paint.Style.FILL
         }
 
-        // Outer Ring (7x7)
-        drawEyeLayer(canvas, ox, oy, s, qrStyle.eyeShape, outerPaint)
-
-        // Middle Inset / Gap (5x5)
-        drawEyeLayer(canvas, ox + cell, oy + cell, cell * 5, qrStyle.eyeShape, bgPaint)
-
-        // Inner Ball / Pupil (3x3 modules)
         val bx = ox + cell * 2
         val by = oy + cell * 2
         val bSize = cell * 3
-        drawEyeLayer(canvas, bx, by, bSize, qrStyle.ballShape, ballPaint)
+        val resolvedEffCol = if (effCol != 0) effCol else if (qrStyle.gradientType != GradientType.None) qrStyle.gradientTo else eyeColor
+        val eyeIntensity = qrStyle.effectIntensity.coerceIn(0.4f, 2.5f)
+
+        when (qrStyle.effect) {
+            QrEffect.None -> {
+                // Outer Ring (7x7)
+                drawEyeLayer(canvas, ox, oy, s, qrStyle.eyeShape, outerPaint)
+
+                // Middle Inset / Gap (5x5)
+                drawEyeLayer(canvas, ox + cell, oy + cell, cell * 5, qrStyle.eyeShape, bgPaint)
+
+                // Inner Ball / Pupil (3x3 modules)
+                drawEyeLayer(canvas, bx, by, bSize, qrStyle.ballShape, ballPaint)
+            }
+            QrEffect.Raised3D -> {
+                val sDist = (cell * 0.42f * eyeIntensity).coerceIn(3.5f, 22f)
+                val bevelStrokeW = (cell * 0.26f).coerceIn(2.5f, 5.5f)
+                val hlStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0xCCFFFFFF.toInt()
+                    style = Paint.Style.STROKE
+                    strokeWidth = bevelStrokeW
+                }
+                val shadeStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0x75000000
+                    style = Paint.Style.STROKE
+                    strokeWidth = bevelStrokeW
+                }
+                val sidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x65000000; style = Paint.Style.FILL }
+
+                // 1. Outer ring extruded sidewall
+                drawEyeLayer(canvas, ox + sDist * 0.45f, oy + sDist * 0.45f, s, qrStyle.eyeShape, sidePaint)
+
+                // 2. Outer ring top face
+                val ringFaceX = ox - sDist * 0.20f
+                val ringFaceY = oy - sDist * 0.20f
+                drawEyeLayer(canvas, ringFaceX, ringFaceY, s, qrStyle.eyeShape, outerPaint)
+
+                // 3. Outer ring specular top-left highlight & bottom-right shadow contour
+                drawEyeLayer(canvas, ringFaceX - sDist * 0.35f, ringFaceY - sDist * 0.35f, s, qrStyle.eyeShape, hlStrokePaint)
+                drawEyeLayer(canvas, ringFaceX + sDist * 0.28f, ringFaceY + sDist * 0.28f, s, qrStyle.eyeShape, shadeStrokePaint)
+
+                // 4. Middle gap (clean background)
+                drawEyeLayer(canvas, ox + cell, oy + cell, cell * 5, qrStyle.eyeShape, bgPaint)
+
+                // 5. Pupil extruded sidewall & top face
+                drawEyeLayer(canvas, bx + sDist * 0.45f, by + sDist * 0.45f, bSize, qrStyle.ballShape, sidePaint)
+                val pupilFaceX = bx - sDist * 0.20f
+                val pupilFaceY = by - sDist * 0.20f
+                drawEyeLayer(canvas, pupilFaceX, pupilFaceY, bSize, qrStyle.ballShape, ballPaint)
+
+                // 6. Pupil specular highlight & center pip
+                drawEyeLayer(canvas, pupilFaceX - sDist * 0.30f, pupilFaceY - sDist * 0.30f, bSize, qrStyle.ballShape, hlStrokePaint)
+                val laserPip = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xEEFFFFFF.toInt(); style = Paint.Style.FILL }
+                drawEyeLayer(canvas, pupilFaceX + bSize * 0.35f, pupilFaceY + bSize * 0.35f, bSize * 0.30f, qrStyle.ballShape, laserPip)
+            }
+            QrEffect.Engraved -> {
+                val inDist = (cell * 0.36f * eyeIntensity).coerceIn(3.0f, 18f)
+
+                // Recessed outer ring
+                drawEyeLayer(canvas, ox + inDist * 0.25f, oy + inDist * 0.25f, s * 0.95f, qrStyle.eyeShape, outerPaint)
+
+                // Middle gap
+                drawEyeLayer(canvas, ox + cell, oy + cell, cell * 5, qrStyle.eyeShape, bgPaint)
+
+                // Sunken pupil core
+                drawEyeLayer(canvas, bx + inDist * 0.20f, by + inDist * 0.20f, bSize * 0.88f, qrStyle.ballShape, ballPaint)
+            }
+            QrEffect.Glow -> {
+                // Solid outer ring with neon edge
+                drawEyeLayer(canvas, ox, oy, s, qrStyle.eyeShape, outerPaint)
+                val neonEdge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = (resolvedEffCol and 0x00FFFFFF) or 0xDD000000.toInt()
+                    style = Paint.Style.STROKE
+                    strokeWidth = (cell * 0.30f).coerceIn(2.5f, 5.0f)
+                }
+                drawEyeLayer(canvas, ox, oy, s, qrStyle.eyeShape, neonEdge)
+
+                // Middle gap
+                drawEyeLayer(canvas, ox + cell, oy + cell, cell * 5, qrStyle.eyeShape, bgPaint)
+
+                // Solid pupil + pip
+                drawEyeLayer(canvas, bx, by, bSize, qrStyle.ballShape, ballPaint)
+                drawEyeLayer(canvas, bx, by, bSize, qrStyle.ballShape, neonEdge)
+                val laserPip = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xEEFFFFFF.toInt(); style = Paint.Style.FILL }
+                drawEyeLayer(canvas, bx + bSize * 0.35f, by + bSize * 0.35f, bSize * 0.30f, qrStyle.ballShape, laserPip)
+            }
+            QrEffect.Shadow -> {
+                drawEyeLayer(canvas, ox, oy, s, qrStyle.eyeShape, outerPaint)
+                drawEyeLayer(canvas, ox + cell, oy + cell, cell * 5, qrStyle.eyeShape, bgPaint)
+                drawEyeLayer(canvas, bx, by, bSize, qrStyle.ballShape, ballPaint)
+            }
+            QrEffect.Emboss -> {
+                val eDist = (cell * 0.30f * eyeIntensity).coerceIn(2.5f, 15f)
+                drawEyeLayer(canvas, ox, oy, s * 0.95f, qrStyle.eyeShape, outerPaint)
+                drawEyeLayer(canvas, ox + cell, oy + cell, cell * 5, qrStyle.eyeShape, bgPaint)
+                drawEyeLayer(canvas, bx, by, bSize * 0.90f, qrStyle.ballShape, ballPaint)
+            }
+            QrEffect.Outline -> {
+                val strokeW = (cell * 0.35f * eyeIntensity).coerceIn(2.5f, 9f)
+                val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0xEEFFFFFF.toInt()
+                    style = Paint.Style.STROKE
+                    strokeWidth = strokeW
+                }
+                drawEyeLayer(canvas, ox, oy, s, qrStyle.eyeShape, outlinePaint)
+                drawEyeLayer(canvas, ox, oy, s, qrStyle.eyeShape, outerPaint)
+
+                drawEyeLayer(canvas, ox + cell, oy + cell, cell * 5, qrStyle.eyeShape, bgPaint)
+
+                drawEyeLayer(canvas, bx, by, bSize, qrStyle.ballShape, outlinePaint)
+                drawEyeLayer(canvas, bx, by, bSize, qrStyle.ballShape, ballPaint)
+            }
+            QrEffect.Glassmorphism -> {
+                val glossPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x88FFFFFF.toInt(); style = Paint.Style.FILL }
+                val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x65FFFFFF; style = Paint.Style.STROKE; strokeWidth = 2.0f }
+
+                drawEyeLayer(canvas, ox, oy, s, qrStyle.eyeShape, outerPaint)
+                drawEyeLayer(canvas, ox - cell * 0.15f, oy - cell * 0.25f, s * 0.55f, qrStyle.eyeShape, glossPaint)
+                drawEyeLayer(canvas, ox, oy, s, qrStyle.eyeShape, rimPaint)
+
+                drawEyeLayer(canvas, ox + cell, oy + cell, cell * 5, qrStyle.eyeShape, bgPaint)
+
+                drawEyeLayer(canvas, bx, by, bSize, qrStyle.ballShape, ballPaint)
+                drawEyeLayer(canvas, bx, by - cell * 0.18f, bSize * 0.55f, qrStyle.ballShape, glossPaint)
+                drawEyeLayer(canvas, bx, by, bSize, qrStyle.ballShape, rimPaint)
+            }
+        }
 
         // If Ticks, draw the 4 cross-hair tick marks
         if (qrStyle.eyeShape == EyeShape.Ticks) {

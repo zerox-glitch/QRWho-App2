@@ -4,10 +4,13 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,14 +24,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.qr.engine.EyeShape
 import com.example.qr.engine.ModuleShape
+import com.example.qr.engine.QrEffect
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.CardDark
 import com.example.ui.theme.ElectricCyan
 import com.example.ui.theme.NeonViolet
+import com.example.ui.theme.SurfaceDark
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -522,6 +529,269 @@ fun EyeBallVisualTile(
                     drawPath(path, shapeColor)
                 }
             }
+        }
+    }
+}
+
+/**
+ * Renders a visual card for a QR Code effect (Engraved, Raised 3D, Glow, etc.)
+ * with live canvas drawing of the effect on mini-modules, effect title, and subtitle.
+ */
+@Composable
+fun QrEffectVisualCard(
+    effect: QrEffect,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    accentColor: Color = ElectricCyan
+) {
+    val bg = if (isSelected) ElectricCyan.copy(alpha = 0.15f) else CardDark
+    val border = if (isSelected) ElectricCyan else CardBorder
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(bg)
+            .border(if (isSelected) 2.dp else 1.dp, border, RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .testTag("qr_effect_${effect.name.lowercase()}"),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            // Live Visual Canvas displaying 4 modules with the effect
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(SurfaceDark)
+                    .border(1.dp, if (isSelected) ElectricCyan.copy(alpha = 0.4f) else CardBorder, RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(modifier = Modifier.size(36.dp)) {
+                    val w = this.size.width
+                    val cell = w / 2f
+                    val r = cell * 0.38f
+                    val centers = listOf(
+                        Offset(cell * 0.5f, cell * 0.5f),
+                        Offset(cell * 1.5f, cell * 0.5f),
+                        Offset(cell * 0.5f, cell * 1.5f),
+                        Offset(cell * 1.5f, cell * 1.5f)
+                    )
+                    val baseCol = if (isSelected) accentColor else Color(0xFFD4D4D8)
+                    val rLuma = (accentColor.red * 0.299f + accentColor.green * 0.587f + accentColor.blue * 0.114f)
+                    val vibrantGlow = if (rLuma > 0.35f) accentColor else ElectricCyan
+
+                    for (c in centers) {
+                        when (effect) {
+                            QrEffect.None -> {
+                                drawRoundRect(
+                                    color = baseCol,
+                                    topLeft = Offset(c.x - r, c.y - r),
+                                    size = Size(r * 2f, r * 2f),
+                                    cornerRadius = CornerRadius(r * 0.3f, r * 0.3f)
+                                )
+                            }
+                            QrEffect.Raised3D -> {
+                                // 1. Ambient + contact drop shadow
+                                drawRoundRect(
+                                    color = Color.Black.copy(alpha = 0.38f),
+                                    topLeft = Offset(c.x - r + 3.5f, c.y - r + 3.5f),
+                                    size = Size(r * 2.1f, r * 2.1f),
+                                    cornerRadius = CornerRadius(r * 0.35f, r * 0.35f)
+                                )
+                                drawRoundRect(
+                                    color = Color.Black.copy(alpha = 0.70f),
+                                    topLeft = Offset(c.x - r + 2f, c.y - r + 2f),
+                                    size = Size(r * 2f, r * 2f),
+                                    cornerRadius = CornerRadius(r * 0.3f, r * 0.3f)
+                                )
+                                // 2. Extruded sidewall
+                                drawRoundRect(
+                                    color = Color.Black.copy(alpha = 0.45f),
+                                    topLeft = Offset(c.x - r + 1f, c.y - r + 1f),
+                                    size = Size(r * 2f, r * 2f),
+                                    cornerRadius = CornerRadius(r * 0.3f, r * 0.3f)
+                                )
+                                // 3. Elevated top face
+                                drawRoundRect(
+                                    color = baseCol,
+                                    topLeft = Offset(c.x - r - 0.5f, c.y - r - 0.5f),
+                                    size = Size(r * 2f, r * 2f),
+                                    cornerRadius = CornerRadius(r * 0.3f, r * 0.3f)
+                                )
+                                // 4. Top-left specular bevel highlight rim
+                                drawRoundRect(
+                                    color = Color.White.copy(alpha = 0.85f),
+                                    topLeft = Offset(c.x - r - 0.8f, c.y - r - 0.8f),
+                                    size = Size(r * 1.9f, r * 1.9f),
+                                    cornerRadius = CornerRadius(r * 0.3f, r * 0.3f),
+                                    style = Stroke(width = 1.5f)
+                                )
+                                // 5. Bottom-right shaded bevel contour
+                                drawRoundRect(
+                                    color = Color.Black.copy(alpha = 0.55f),
+                                    topLeft = Offset(c.x - r + 0.5f, c.y - r + 0.5f),
+                                    size = Size(r * 1.9f, r * 1.9f),
+                                    cornerRadius = CornerRadius(r * 0.3f, r * 0.3f),
+                                    style = Stroke(width = 1.5f)
+                                )
+                            }
+                            QrEffect.Engraved -> {
+                                // Deep carved cavity shadow top-left
+                                drawRoundRect(
+                                    color = Color.Black.copy(alpha = 0.85f),
+                                    topLeft = Offset(c.x - r - 2f, c.y - r - 2f),
+                                    size = Size(r * 2.1f, r * 2.1f),
+                                    cornerRadius = CornerRadius(r * 0.35f, r * 0.35f)
+                                )
+                                // Chisel lip reflection bottom-right
+                                drawRoundRect(
+                                    color = Color.White.copy(alpha = 0.80f),
+                                    topLeft = Offset(c.x - r + 2f, c.y - r + 2f),
+                                    size = Size(r * 2.1f, r * 2.1f),
+                                    cornerRadius = CornerRadius(r * 0.35f, r * 0.35f)
+                                )
+                                // Sunken core
+                                drawRoundRect(
+                                    color = baseCol,
+                                    topLeft = Offset(c.x - r * 0.78f + 0.5f, c.y - r * 0.78f + 0.5f),
+                                    size = Size(r * 1.56f, r * 1.56f),
+                                    cornerRadius = CornerRadius(r * 0.25f, r * 0.25f)
+                                )
+                            }
+                            QrEffect.Glow -> {
+                                // Wide neon bloom
+                                drawCircle(
+                                    color = vibrantGlow.copy(alpha = 0.35f),
+                                    radius = r * 2.0f,
+                                    center = c
+                                )
+                                // Intense corona
+                                drawCircle(
+                                    color = vibrantGlow.copy(alpha = 0.65f),
+                                    radius = r * 1.4f,
+                                    center = c
+                                )
+                                // Solid core
+                                drawRoundRect(
+                                    color = baseCol,
+                                    topLeft = Offset(c.x - r, c.y - r),
+                                    size = Size(r * 2f, r * 2f),
+                                    cornerRadius = CornerRadius(r * 0.3f, r * 0.3f)
+                                )
+                                // Electric rim
+                                drawRoundRect(
+                                    color = vibrantGlow,
+                                    topLeft = Offset(c.x - r, c.y - r),
+                                    size = Size(r * 2f, r * 2f),
+                                    cornerRadius = CornerRadius(r * 0.3f, r * 0.3f),
+                                    style = Stroke(width = 1.6f)
+                                )
+                                // Center laser pip
+                                drawCircle(
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    radius = r * 0.32f,
+                                    center = c
+                                )
+                            }
+                            QrEffect.Shadow -> {
+                                drawRoundRect(
+                                    color = Color.Black.copy(alpha = 0.35f),
+                                    topLeft = Offset(c.x - r + 4.5f, c.y - r + 4.5f),
+                                    size = Size(r * 2.2f, r * 2.2f),
+                                    cornerRadius = CornerRadius(r * 0.35f, r * 0.35f)
+                                )
+                                drawRoundRect(
+                                    color = Color.Black.copy(alpha = 0.70f),
+                                    topLeft = Offset(c.x - r + 2.5f, c.y - r + 2.5f),
+                                    size = Size(r * 2f, r * 2f),
+                                    cornerRadius = CornerRadius(r * 0.3f, r * 0.3f)
+                                )
+                                drawRoundRect(
+                                    color = baseCol,
+                                    topLeft = Offset(c.x - r, c.y - r),
+                                    size = Size(r * 2f, r * 2f),
+                                    cornerRadius = CornerRadius(r * 0.3f, r * 0.3f)
+                                )
+                            }
+                            QrEffect.Emboss -> {
+                                drawRoundRect(
+                                    color = Color.White.copy(alpha = 0.85f),
+                                    topLeft = Offset(c.x - r - 2f, c.y - r - 2f),
+                                    size = Size(r * 2f, r * 2f),
+                                    cornerRadius = CornerRadius(r * 0.3f, r * 0.3f)
+                                )
+                                drawRoundRect(
+                                    color = Color.Black.copy(alpha = 0.75f),
+                                    topLeft = Offset(c.x - r + 2f, c.y - r + 2f),
+                                    size = Size(r * 2f, r * 2f),
+                                    cornerRadius = CornerRadius(r * 0.3f, r * 0.3f)
+                                )
+                                drawRoundRect(
+                                    color = baseCol,
+                                    topLeft = Offset(c.x - r * 0.88f, c.y - r * 0.88f),
+                                    size = Size(r * 1.76f, r * 1.76f),
+                                    cornerRadius = CornerRadius(r * 0.25f, r * 0.25f)
+                                )
+                            }
+                            QrEffect.Outline -> {
+                                drawRoundRect(
+                                    color = Color.White,
+                                    topLeft = Offset(c.x - r - 0.5f, c.y - r - 0.5f),
+                                    size = Size(r * 2.1f, r * 2.1f),
+                                    cornerRadius = CornerRadius(r * 0.35f, r * 0.35f),
+                                    style = Stroke(width = 3f)
+                                )
+                                drawRoundRect(
+                                    color = baseCol,
+                                    topLeft = Offset(c.x - r * 0.82f, c.y - r * 0.82f),
+                                    size = Size(r * 1.64f, r * 1.64f),
+                                    cornerRadius = CornerRadius(r * 0.2f, r * 0.2f)
+                                )
+                            }
+                            QrEffect.Glassmorphism -> {
+                                drawRoundRect(
+                                    color = Color.Black.copy(alpha = 0.45f),
+                                    topLeft = Offset(c.x - r + 2.5f, c.y - r + 2.5f),
+                                    size = Size(r * 2.05f, r * 2.05f),
+                                    cornerRadius = CornerRadius(r * 0.3f, r * 0.3f)
+                                )
+                                drawRoundRect(
+                                    color = baseCol,
+                                    topLeft = Offset(c.x - r, c.y - r),
+                                    size = Size(r * 2f, r * 2f),
+                                    cornerRadius = CornerRadius(r * 0.3f, r * 0.3f)
+                                )
+                                drawRoundRect(
+                                    color = Color.White.copy(alpha = 0.70f),
+                                    topLeft = Offset(c.x - r + 1f, c.y - r + 1f),
+                                    size = Size(r * 1.8f, r * 0.9f),
+                                    cornerRadius = CornerRadius(r * 0.2f, r * 0.2f)
+                                )
+                                drawRoundRect(
+                                    color = Color.White.copy(alpha = 0.55f),
+                                    topLeft = Offset(c.x - r, c.y - r),
+                                    size = Size(r * 2f, r * 2f),
+                                    cornerRadius = CornerRadius(r * 0.3f, r * 0.3f),
+                                    style = Stroke(width = 1.8f)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Text(
+                text = effect.label,
+                color = if (isSelected) ElectricCyan else Color.White,
+                fontSize = 11.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                maxLines = 1
+            )
         }
     }
 }

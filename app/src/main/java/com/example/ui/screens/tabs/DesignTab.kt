@@ -78,6 +78,7 @@ import com.example.qr.engine.EyeShape
 import com.example.qr.engine.FrameStyle
 import com.example.qr.engine.GradientType
 import com.example.qr.engine.ModuleShape
+import com.example.qr.engine.QrEffect
 import com.example.qr.engine.QrStyle
 import com.example.qr.engine.RasterFrameGenerator
 import com.example.ui.components.ColorTarget
@@ -85,6 +86,7 @@ import com.example.ui.components.CustomColorSection
 import com.example.ui.components.EyeBallVisualTile
 import com.example.ui.components.EyeShapeVisualTile
 import com.example.ui.components.ModuleShapeVisualTile
+import com.example.ui.components.QrEffectVisualCard
 import com.example.ui.theme.BeaconRose
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.CardDark
@@ -288,7 +290,181 @@ fun DesignTab(
             }
         }
 
-        // 4. Custom Color Picker (Full customization for Foreground, Background, Eyes, Gradient)
+        // 4. QR Visual & 3D Depth Effects
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = null,
+                        tint = ElectricCyan,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("QR Effects & 3D Depth", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
+
+                // Active Effect Badge
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (style.effect != QrEffect.None) ElectricCyan.copy(alpha = 0.2f) else SurfaceDark)
+                        .border(1.dp, if (style.effect != QrEffect.None) ElectricCyan else CardBorder, RoundedCornerShape(12.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = style.effect.label,
+                        color = if (style.effect != QrEffect.None) ElectricCyan else TextMuted,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Apply tactile 3D relief, carved engraved depth, vibrant neon glow, or keylines with camera-optimized scannability.",
+                color = TextMuted,
+                fontSize = 11.sp
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Visual Effect Cards Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                QrEffect.values().forEach { effect ->
+                    val isSelected = style.effect == effect
+                    QrEffectVisualCard(
+                        effect = effect,
+                        isSelected = isSelected,
+                        onClick = { onStyleChange(style.copy(effect = effect)) },
+                        accentColor = Color(if (style.gradientType != GradientType.None) style.gradientTo else style.fgColor)
+                    )
+                }
+            }
+
+            // 3D Depth & Effect Intensity Control
+            if (style.effect != QrEffect.None) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(CardDark)
+                        .border(1.dp, CardBorder, RoundedCornerShape(12.dp))
+                        .padding(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "3D Depth & Effect Pop",
+                            color = TextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        val multiplierStr = String.format("%.1fx", style.effectIntensity)
+                        Text(
+                            text = multiplierStr,
+                            color = ElectricCyan,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Preset Intensity Chips: Subtle (0.7x), Balanced (1.0x), Punchy (1.5x), Ultra 3D (2.2x)
+                    val intensityPresets = listOf(
+                        "Subtle" to 0.7f,
+                        "Balanced" to 1.0f,
+                        "Punchy" to 1.5f,
+                        "Ultra 3D" to 2.2f
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        intensityPresets.forEach { (label, presetVal) ->
+                            val isPresetActive = Math.abs(style.effectIntensity - presetVal) < 0.15f
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isPresetActive) ElectricCyan.copy(alpha = 0.2f) else SurfaceDark)
+                                    .border(1.dp, if (isPresetActive) ElectricCyan else CardBorder, RoundedCornerShape(8.dp))
+                                    .clickable { onStyleChange(style.copy(effectIntensity = presetVal)) }
+                                    .padding(vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    color = if (isPresetActive) ElectricCyan else TextSecondary,
+                                    fontSize = 10.sp,
+                                    fontWeight = if (isPresetActive) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Slider(
+                        value = style.effectIntensity,
+                        onValueChange = { onStyleChange(style.copy(effectIntensity = it)) },
+                        valueRange = 0.4f..2.5f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = ElectricCyan,
+                            activeTrackColor = ElectricCyan,
+                            inactiveTrackColor = SurfaceDark
+                        ),
+                        modifier = Modifier.fillMaxWidth().height(24.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Camera Readability & Optimization Notice
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .border(1.dp, EmeraldGreen.copy(alpha = 0.35f), RoundedCornerShape(10.dp)),
+                color = EmeraldGreen.copy(alpha = 0.08f)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = EmeraldGreen,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(7.dp))
+                    Text(
+                        text = "Camera-Optimized: Module cores and 1:1:3:1:1 finder eyes remain 100% solid for instant high-speed mobile scanning.",
+                        color = TextSecondary,
+                        fontSize = 10.sp,
+                        lineHeight = 13.sp
+                    )
+                }
+            }
+        }
+
+        // 5. Custom Color Picker (Full customization for Foreground, Background, Eyes, Gradient)
         CustomColorSection(
             style = style,
             onStyleChange = onStyleChange,

@@ -238,6 +238,8 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                 p.putInt("s_ball_color", s.ballColor)
                 p.putString("s_gradient_type", s.gradientType.name)
                 p.putInt("s_gradient_to", s.gradientTo)
+                p.putString("s_effect", s.effect.name)
+                p.putFloat("s_effect_intensity", s.effectIntensity)
                 p.putString("s_frame_style", s.frameStyle.name)
                 p.putString("s_frame_caption", s.frameCaption)
                 p.putInt("s_quiet_zone", s.quietZone)
@@ -290,6 +292,8 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
             val eyeShape = try { EyeShape.valueOf(p.getString("s_eye_shape", "Leaf") ?: "Leaf") } catch (_: Exception) { EyeShape.Leaf }
             val ballShape = try { EyeShape.valueOf(p.getString("s_ball_shape", "Rounded") ?: "Rounded") } catch (_: Exception) { EyeShape.Rounded }
             val gradientType = try { GradientType.valueOf(p.getString("s_gradient_type", "Diagonal") ?: "Diagonal") } catch (_: Exception) { GradientType.Diagonal }
+            val effect = try { com.example.qr.engine.QrEffect.valueOf(p.getString("s_effect", "None") ?: "None") } catch (_: Exception) { com.example.qr.engine.QrEffect.None }
+            val effectIntensity = p.getFloat("s_effect_intensity", 1.0f).coerceIn(0.4f, 2.0f)
             val frameStyle = try { FrameStyle.valueOf(p.getString("s_frame_style", "None") ?: "None") } catch (_: Exception) { FrameStyle.None }
             val imageMode = try { ImageMode.valueOf(p.getString("s_image_mode", "Clean") ?: "Clean") } catch (_: Exception) { ImageMode.Clean }
 
@@ -303,6 +307,8 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                 ballColor = p.getInt("s_ball_color", 0xFF65A30D.toInt()),
                 gradientType = gradientType,
                 gradientTo = p.getInt("s_gradient_to", 0xFFEAB308.toInt()),
+                effect = effect,
+                effectIntensity = effectIntensity,
                 frameStyle = frameStyle,
                 frameCaption = p.getString("s_frame_caption", "SCAN ME") ?: "SCAN ME",
                 quietZone = p.getInt("s_quiet_zone", 2),

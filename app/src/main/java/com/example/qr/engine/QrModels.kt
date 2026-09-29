@@ -338,12 +338,20 @@ object WeavePresets {
     )
 }
 
-enum class QrEffect(val label: String) {
-    None("None"),
-    Shadow("Drop Shadow"),
-    Glow("Neon Glow"),
-    Outline("Outline Keyline"),
-    Emboss("Emboss")
+enum class QrEffect(val label: String, val subtitle: String = "", val apiKey: String = "") {
+    None("None", "Flat modern modules", "none"),
+    Raised3D("Raised 3D", "Tactile 3D button depth with light source highlight & cast shadow", "raised3d"),
+    Engraved("Engraved", "Recessed into surface with carved inner shadow & chiseled rim", "engraved"),
+    Glow("Neon Glow", "Radiant luminescent aura with high-contrast scannable core", "glow"),
+    Shadow("Drop Shadow", "Smooth elevated floating depth with soft ambient shadow", "shadow"),
+    Emboss("Embossed", "Dual-specular stamped paper/metallic relief styling", "emboss"),
+    Outline("Keyline Outline", "Crisp high-contrast boundary for razor-sharp camera scanning", "outline"),
+    Glassmorphism("Glassmorphism", "Frosted glass sheen with upper specular arc reflection", "glassmorphic");
+
+    companion object {
+        fun fromString(key: String): QrEffect =
+            values().find { it.apiKey.equals(key, ignoreCase = true) || it.name.equals(key, ignoreCase = true) || it.label.equals(key, ignoreCase = true) } ?: None
+    }
 }
 
 enum class FrameStyle(val label: String) {
@@ -410,6 +418,7 @@ data class QrStyle(
     val logoScale: Float = 0.22f,
     val artisticStrength: Float = 0.42f,
     val effect: QrEffect = QrEffect.None,
+    val effectIntensity: Float = 1.0f,
     val ecc: String = "H", // ISO/IEC 18004 Error Correction Level H default for maximum scannability
     val transparentBg: Boolean = false,
     val frameStyle: FrameStyle = FrameStyle.None,

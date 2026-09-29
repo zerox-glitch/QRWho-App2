@@ -116,6 +116,8 @@ object QrPresets {
             ecc = o.optString("ecc", "H"),
             artisticStrength = o.optDouble("artisticStrength", 0.5).toFloat(),
             artDirection = o.optString("artDirection", null),
+            effect = QrEffect.fromString(o.optString("effect", "none")),
+            effectIntensity = o.optDouble("effectIntensity", 1.0).toFloat(),
             frameStyle = FrameStyle.fromString(frameStyleStr),
             frameCaption = frameCaptionStr
         )
