@@ -1,5 +1,6 @@
 package com.example.qr.engine
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -58,9 +59,9 @@ object QrGenerator {
     /**
      * Quickly renders an authentic miniature QR code for presets, showcase cards, and galleries.
      */
-    fun generateThumbnail(qrStyle: QrStyle, sizePx: Int = 180): Bitmap = getOrGenerateThumbnail(qrStyle, sizePx)
+    fun generateThumbnail(qrStyle: QrStyle, sizePx: Int = 180, context: Context? = null): Bitmap = getOrGenerateThumbnail(qrStyle, sizePx, context)
 
-    fun getOrGenerateThumbnail(qrStyle: QrStyle, sizePx: Int = 120): Bitmap {
+    fun getOrGenerateThumbnail(qrStyle: QrStyle, sizePx: Int = 120, context: Context? = null): Bitmap {
         val key = qrStyle.hashCode() * 31 + sizePx
         val cached = thumbnailCache.get(key)
         if (cached != null) return cached
@@ -69,16 +70,6 @@ object QrGenerator {
         val matrixSize = matrix.width
         val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-
-        // Draw background
-        if (qrStyle.artDirection != null && ArtFrameRenderer.isArtFrame(qrStyle.artDirection)) {
-            ArtFrameRenderer.render(qrStyle.artDirection, canvas, sizePx.toFloat())
-        } else if (!qrStyle.transparentBg) {
-            val bgPaint = Paint().apply { color = qrStyle.bgColor }
-            canvas.drawRect(0f, 0f, sizePx.toFloat(), sizePx.toFloat(), bgPaint)
-        } else {
-            bitmap.eraseColor(0x00000000)
-        }
 
         val hasFrame = qrStyle.frameStyle != FrameStyle.None
         val insets = calculateFrameInsets(qrStyle.frameStyle, qrStyle.artDirection, sizePx)
@@ -90,6 +81,18 @@ object QrGenerator {
         val cellSize = min(usableWidth, usableHeight) / totalModules.toFloat()
         val originX = insets.left + (usableWidth - matrixSize * cellSize) / 2f
         val originY = insets.top + (usableHeight - matrixSize * cellSize) / 2f
+
+        // Draw background
+        val artId = qrStyle.artDirection
+        if (artId != null && ArtFrameRenderer.isArtFrame(artId)) {
+            val artBmp = SamplePhotos.getThumbnail(context, artId, sizePx)
+            renderPhotoUnderlay(canvas, artBmp, qrStyle, originX, originY, matrixSize * cellSize, sizePx, cellSize, matrixSize)
+        } else if (!qrStyle.transparentBg) {
+            val bgPaint = Paint().apply { color = qrStyle.bgColor }
+            canvas.drawRect(0f, 0f, sizePx.toFloat(), sizePx.toFloat(), bgPaint)
+        } else {
+            bitmap.eraseColor(0x00000000)
+        }
 
         if (hasFrame) {
             drawFrameBackground(canvas, qrStyle.frameStyle, sizePx, qrStyle)
@@ -166,7 +169,8 @@ object QrGenerator {
         qrStyle: QrStyle,
         photoBitmap: Bitmap? = null,
         customLogo: Bitmap? = null,
-        sizePx: Int = 1024
+        sizePx: Int = 1024,
+        context: Context? = null
     ): Bitmap {
         val ecc = when (qrStyle.ecc.uppercase()) {
             "L" -> ErrorCorrectionLevel.L
@@ -239,15 +243,16 @@ object QrGenerator {
             drawFrameBackground(canvas, qrStyle.frameStyle, sizePx, qrStyle)
         }
 
-        // 2. Draw Photo Underlay only for Clean mode (Clean overlay)
-        val hasPhotoUnderlay = photoBitmap != null && qrStyle.imageMode == ImageMode.Clean
-        if (hasPhotoUnderlay && photoBitmap != null) {
-            renderPhotoUnderlay(canvas, photoBitmap, qrStyle, originX, originY, matrixSize * cellSize, sizePx, cellSize, matrixSize)
-        } else if (photoBitmap == null && qrStyle.artDirection != null && ArtFrameRenderer.isArtFrame(qrStyle.artDirection)) {
-            ArtFrameRenderer.render(qrStyle.artDirection, canvas, sizePx.toFloat())
+        // 2. Draw Photo Underlay
+        val effectivePhoto = photoBitmap ?: if (qrStyle.artDirection != null && ArtFrameRenderer.isArtFrame(qrStyle.artDirection)) {
+            SamplePhotos.getThumbnail(context, qrStyle.artDirection, sizePx)
+        } else null
+
+        if (effectivePhoto != null) {
+            renderPhotoUnderlay(canvas, effectivePhoto, qrStyle, originX, originY, matrixSize * cellSize, sizePx, cellSize, matrixSize)
         }
 
-        val hasPhoto = photoBitmap != null && qrStyle.imageMode != ImageMode.None && qrStyle.imageMode != ImageMode.Logo
+        val hasPhoto = (photoBitmap != null || effectivePhoto != null) && qrStyle.imageMode != ImageMode.None && qrStyle.imageMode != ImageMode.Logo
 
         // 3. Setup Module Shader / Paint
         val modulePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1075,18 +1080,12 @@ object QrGenerator {
         }
         return when (frameStyle) {
             FrameStyle.None -> FrameInsets(0f, 0f, 0f, 0f)
-            FrameStyle.SimpleBorder -> FrameInsets(s * 0.012f, s * 0.012f, s * 0.012f, s * 0.012f)
-            FrameStyle.BadgeScanMe -> FrameInsets(s * 0.012f, s * 0.012f, s * 0.012f, s * 0.045f)
-            FrameStyle.ModernPill -> FrameInsets(s * 0.012f, s * 0.012f, s * 0.012f, s * 0.045f)
-            FrameStyle.NeonGlow -> FrameInsets(s * 0.012f, s * 0.012f, s * 0.012f, s * 0.045f)
-            FrameStyle.Badge -> FrameInsets(s * 0.012f, s * 0.012f, s * 0.012f, s * 0.045f)
-            FrameStyle.Card -> FrameInsets(s * 0.012f, s * 0.012f, s * 0.012f, s * 0.045f)
-            FrameStyle.Label -> FrameInsets(s * 0.012f, s * 0.042f, s * 0.012f, s * 0.012f)
-            FrameStyle.Speech -> FrameInsets(s * 0.012f, s * 0.012f, s * 0.012f, s * 0.045f)
-            FrameStyle.Bracket -> FrameInsets(s * 0.012f, s * 0.042f, s * 0.012f, s * 0.012f)
-            FrameStyle.Plaque -> FrameInsets(s * 0.012f, s * 0.012f, s * 0.012f, s * 0.045f)
-            FrameStyle.PhoneFrame -> FrameInsets(s * 0.012f, s * 0.022f, s * 0.012f, s * 0.012f)
-            else -> FrameInsets(s * 0.012f, s * 0.012f, s * 0.012f, s * 0.012f)
+            FrameStyle.ModernPill,
+            FrameStyle.Label,
+            FrameStyle.Speech,
+            FrameStyle.Bracket,
+            FrameStyle.PhoneFrame -> FrameInsets(s * 0.020f, s * 0.095f, s * 0.020f, s * 0.020f)
+            else -> FrameInsets(s * 0.020f, s * 0.020f, s * 0.020f, s * 0.095f)
         }
     }
 
@@ -1119,7 +1118,7 @@ object QrGenerator {
         canvas.drawRoundRect(pillRect, cornerRadius, cornerRadius, pillPaint)
 
         val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0x88FFFFFF.toInt()
+            color = 0x66FFFFFF.toInt()
             style = Paint.Style.STROKE
             strokeWidth = s * 0.003f
         }
@@ -1134,7 +1133,7 @@ object QrGenerator {
         var targetTextSize = badgeHeight * 0.52f
         textPaint.textSize = targetTextSize
 
-        val maxTextWidth = badgeWidth - s * 0.04f
+        val maxTextWidth = badgeWidth - s * 0.05f
         val measuredWidth = textPaint.measureText(textToDraw)
         if (measuredWidth > maxTextWidth && measuredWidth > 0f) {
             targetTextSize *= (maxTextWidth / measuredWidth)
@@ -1152,243 +1151,8 @@ object QrGenerator {
         sizePx: Int,
         qrStyle: QrStyle
     ) {
-        val s = sizePx.toFloat()
-        when (frameStyle) {
-            FrameStyle.Bracket -> {
-                val cardRect = RectF(s * 0.02f, s * 0.03f, s * 0.98f, s * 0.98f)
-                val cardBg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt(); style = Paint.Style.FILL }
-                canvas.drawRoundRect(cardRect, s * 0.04f, s * 0.04f, cardBg)
-            }
-            FrameStyle.Badge -> {
-                val rosettePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFF5B21B6.toInt()
-                    style = Paint.Style.FILL
-                }
-                val cx = s / 2f
-                val cy = s * 0.45f
-                val petals = 16
-                val outerR = s * 0.49f
-                val innerR = s * 0.45f
-                val rosettePath = Path()
-                for (i in 0 until petals * 2) {
-                    val angle = (Math.PI / petals * i).toFloat()
-                    val r = if (i % 2 == 0) outerR else innerR
-                    val px = cx + cos(angle.toDouble()).toFloat() * r
-                    val py = cy + sin(angle.toDouble()).toFloat() * r
-                    if (i == 0) rosettePath.moveTo(px, py) else rosettePath.lineTo(px, py)
-                }
-                rosettePath.close()
-                canvas.drawPath(rosettePath, rosettePaint)
-
-                val whitePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt(); style = Paint.Style.FILL }
-                canvas.drawCircle(cx, cy, s * 0.43f, whitePaint)
-            }
-            FrameStyle.Arch -> {
-                val archPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFF4C1D95.toInt()
-                    style = Paint.Style.FILL
-                }
-                val archPath = Path().apply {
-                    moveTo(s * 0.03f, s * 0.98f)
-                    lineTo(s * 0.97f, s * 0.98f)
-                    lineTo(s * 0.97f, s * 0.25f)
-                    arcTo(RectF(s * 0.03f, s * 0.01f, s * 0.97f, s * 0.50f), 0f, -180f, false)
-                    lineTo(s * 0.03f, s * 0.98f)
-                    close()
-                }
-                canvas.drawPath(archPath, archPaint)
-
-                val innerCard = RectF(s * 0.05f, s * 0.06f, s * 0.95f, s * 0.84f)
-                val innerWhite = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt(); style = Paint.Style.FILL }
-                canvas.drawRoundRect(innerCard, s * 0.04f, s * 0.04f, innerWhite)
-            }
-            FrameStyle.Cup -> {
-                val cupPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFF0D9488.toInt()
-                    style = Paint.Style.FILL
-                }
-                val cupPath = Path().apply {
-                    moveTo(s * 0.05f, s * 0.12f)
-                    lineTo(s * 0.95f, s * 0.12f)
-                    lineTo(s * 0.88f, s * 0.98f)
-                    quadTo(s * 0.88f, s * 0.99f, s * 0.82f, s * 0.99f)
-                    lineTo(s * 0.18f, s * 0.99f)
-                    quadTo(s * 0.12f, s * 0.99f, s * 0.12f, s * 0.98f)
-                    close()
-                }
-                canvas.drawPath(cupPath, cupPaint)
-
-                val whiteCard = RectF(s * 0.07f, s * 0.08f, s * 0.93f, s * 0.88f)
-                val whiteP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt(); style = Paint.Style.FILL }
-                canvas.drawRoundRect(whiteCard, s * 0.04f, s * 0.04f, whiteP)
-            }
-            FrameStyle.Card -> {
-                val cardFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFF0D9488.toInt()
-                    style = Paint.Style.FILL
-                }
-                val outerRect = RectF(s * 0.03f, s * 0.02f, s * 0.97f, s * 0.98f)
-                canvas.drawRoundRect(outerRect, s * 0.06f, s * 0.06f, cardFill)
-
-                val whiteRect = RectF(s * 0.05f, s * 0.03f, s * 0.95f, s * 0.86f)
-                val whiteP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt(); style = Paint.Style.FILL }
-                canvas.drawRoundRect(whiteRect, s * 0.04f, s * 0.04f, whiteP)
-            }
-            FrameStyle.Label -> {
-                val labelFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFF0D9488.toInt()
-                    style = Paint.Style.FILL
-                }
-                val labelRect = RectF(s * 0.03f, s * 0.02f, s * 0.97f, s * 0.98f)
-                canvas.drawRoundRect(labelRect, s * 0.06f, s * 0.06f, labelFill)
-
-                val whiteRect = RectF(s * 0.05f, s * 0.09f, s * 0.95f, s * 0.95f)
-                val whiteP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt(); style = Paint.Style.FILL }
-                canvas.drawRoundRect(whiteRect, s * 0.04f, s * 0.04f, whiteP)
-            }
-            FrameStyle.Speech -> {
-                val speechFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFF67E8F9.toInt()
-                    style = Paint.Style.FILL
-                }
-                val speechPath = Path().apply {
-                    addCircle(s / 2f, s * 0.44f, s * 0.46f, Path.Direction.CW)
-                    moveTo(s * 0.20f, s * 0.72f)
-                    lineTo(s * 0.08f, s * 0.96f)
-                    lineTo(s * 0.36f, s * 0.86f)
-                    close()
-                }
-                canvas.drawPath(speechPath, speechFill)
-            }
-            FrameStyle.Note -> {
-                val noteFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFFFEF08A.toInt()
-                    style = Paint.Style.FILL
-                }
-                val fold = s * 0.10f
-                val inset = s * 0.02f
-                val notePath = Path().apply {
-                    moveTo(inset, inset)
-                    lineTo(s - inset, inset)
-                    lineTo(s - inset, s - inset - fold)
-                    lineTo(s - inset - fold, s - inset)
-                    lineTo(inset, s - inset)
-                    close()
-                }
-                canvas.drawPath(notePath, noteFill)
-            }
-            FrameStyle.Globe -> {
-                val globeFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFFBFDBFE.toInt()
-                    style = Paint.Style.FILL
-                }
-                canvas.drawCircle(s / 2f, s / 2f, s * 0.49f, globeFill)
-            }
-            FrameStyle.Plaque -> {
-                val plaqueFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFFBEF264.toInt()
-                    style = Paint.Style.FILL
-                }
-                val cornerCut = s * 0.08f
-                val pi = s * 0.02f
-                val plaquePath = Path().apply {
-                    moveTo(pi + cornerCut, pi)
-                    lineTo(s - pi - cornerCut, pi)
-                    quadTo(s - pi, pi, s - pi, pi + cornerCut)
-                    lineTo(s - pi, s - pi - cornerCut)
-                    quadTo(s - pi, s - pi, s - pi - cornerCut, s - pi)
-                    lineTo(pi + cornerCut, s - pi)
-                    quadTo(pi, s - pi, pi, s - pi - cornerCut)
-                    lineTo(pi, pi + cornerCut)
-                    quadTo(pi, pi, pi + cornerCut, pi)
-                    close()
-                }
-                canvas.drawPath(plaquePath, plaqueFill)
-            }
-            FrameStyle.Pentagon -> {
-                val pentaFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFFFB7185.toInt()
-                    style = Paint.Style.FILL
-                }
-                val pentaPath = Path().apply {
-                    moveTo(s * 0.50f, s * 0.01f)
-                    lineTo(s * 0.99f, s * 0.32f)
-                    lineTo(s * 0.88f, s * 0.98f)
-                    lineTo(s * 0.12f, s * 0.98f)
-                    lineTo(s * 0.01f, s * 0.32f)
-                    close()
-                }
-                canvas.drawPath(pentaPath, pentaFill)
-            }
-            FrameStyle.Hexagon -> {
-                val hexFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFFFBBF24.toInt()
-                    style = Paint.Style.FILL
-                }
-                val hexPath = Path().apply {
-                    moveTo(s * 0.50f, s * 0.01f)
-                    lineTo(s * 0.99f, s * 0.25f)
-                    lineTo(s * 0.99f, s * 0.75f)
-                    lineTo(s * 0.50f, s * 0.99f)
-                    lineTo(s * 0.01f, s * 0.75f)
-                    lineTo(s * 0.01f, s * 0.25f)
-                    close()
-                }
-                canvas.drawPath(hexPath, hexFill)
-            }
-            FrameStyle.Diamond -> {
-                val diaFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = qrStyle.bgColor
-                    style = Paint.Style.FILL
-                }
-                val diaPath = Path().apply {
-                    moveTo(s * 0.50f, s * 0.01f)
-                    lineTo(s * 0.99f, s * 0.50f)
-                    lineTo(s * 0.50f, s * 0.99f)
-                    lineTo(s * 0.01f, s * 0.50f)
-                    close()
-                }
-                canvas.drawPath(diaPath, diaFill)
-            }
-            FrameStyle.Seal -> {
-                val sealFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFFF87171.toInt()
-                    style = Paint.Style.FILL
-                }
-                val cx = s / 2f
-                val cy = s / 2f
-                val petals = 18
-                val outerR = s * 0.49f
-                val innerR = s * 0.46f
-                val sealPath = Path()
-                for (i in 0 until petals * 2) {
-                    val angle = (Math.PI / petals * i).toFloat()
-                    val r = if (i % 2 == 0) outerR else innerR
-                    val px = cx + cos(angle.toDouble()).toFloat() * r
-                    val py = cy + sin(angle.toDouble()).toFloat() * r
-                    if (i == 0) sealPath.moveTo(px, py) else sealPath.lineTo(px, py)
-                }
-                sealPath.close()
-                canvas.drawPath(sealPath, sealFill)
-            }
-            FrameStyle.Bucket -> {
-                val bucketFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFF93C5FD.toInt()
-                    style = Paint.Style.FILL
-                }
-                val bucketPath = Path().apply {
-                    moveTo(s * 0.05f, s * 0.06f)
-                    lineTo(s * 0.95f, s * 0.06f)
-                    lineTo(s * 0.88f, s * 0.98f)
-                    quadTo(s * 0.86f, s * 0.99f, s * 0.80f, s * 0.99f)
-                    lineTo(s * 0.20f, s * 0.99f)
-                    quadTo(s * 0.14f, s * 0.99f, s * 0.12f, s * 0.98f)
-                    close()
-                }
-                canvas.drawPath(bucketPath, bucketFill)
-            }
-            else -> {}
-        }
+        // Frames no longer draw opaque/clunky background shapes behind QR modules.
+        // This keeps the QR code matrix 100% visible, uncluttered, and scannable.
     }
 
     private fun drawFrameForeground(
@@ -1404,141 +1168,51 @@ object QrGenerator {
         val s = sizePx.toFloat()
         val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xFFFFFFFF.toInt()
-            textSize = s * 0.042f
+            textSize = s * 0.038f
             textAlign = Paint.Align.CENTER
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
 
+        val primaryColor = if (qrStyle.gradientType != GradientType.None) qrStyle.gradientTo else qrStyle.fgColor
+
         when (frameStyle) {
-            FrameStyle.SimpleBorder -> {
-                val framePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = qrStyle.fgColor
-                    style = Paint.Style.STROKE
-                    strokeWidth = s * 0.012f
-                }
-                canvas.drawRoundRect(RectF(s * 0.012f, s * 0.012f, s * 0.988f, s * 0.988f), s * 0.025f, s * 0.025f, framePaint)
-            }
             FrameStyle.BadgeScanMe -> {
-                val framePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = qrStyle.fgColor
-                    style = Paint.Style.STROKE
-                    strokeWidth = s * 0.012f
-                }
-                canvas.drawRoundRect(RectF(s * 0.012f, s * 0.012f, s * 0.988f, s * 0.950f), s * 0.025f, s * 0.025f, framePaint)
+                // Badge 1: Sleek Bottom Capsule
                 drawBadgePill(
                     canvas = canvas,
                     caption = caption,
                     defaultText = "SCAN ME",
                     centerX = s / 2f,
-                    centerY = s * 0.965f,
-                    badgeWidth = s * 0.65f,
-                    badgeHeight = s * 0.060f,
+                    centerY = s * 0.952f,
+                    badgeWidth = s * 0.60f,
+                    badgeHeight = s * 0.068f,
                     pillColor = qrStyle.fgColor,
                     textColor = 0xFFFFFFFF.toInt(),
                     s = s
                 )
             }
             FrameStyle.ModernPill -> {
-                val pillColor = if (qrStyle.gradientType != GradientType.None) qrStyle.gradientTo else qrStyle.fgColor
+                // Badge 2: Sleek Top Capsule
                 drawBadgePill(
                     canvas = canvas,
                     caption = caption,
                     defaultText = "SCAN ME",
                     centerX = s / 2f,
-                    centerY = s * 0.965f,
-                    badgeWidth = s * 0.65f,
-                    badgeHeight = s * 0.060f,
-                    pillColor = pillColor,
+                    centerY = s * 0.048f,
+                    badgeWidth = s * 0.60f,
+                    badgeHeight = s * 0.068f,
+                    pillColor = primaryColor,
                     textColor = 0xFFFFFFFF.toInt(),
                     s = s
                 )
             }
-            FrameStyle.PhoneFrame -> {
-                val framePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = qrStyle.fgColor
-                    style = Paint.Style.STROKE
-                    strokeWidth = s * 0.015f
-                }
-                val phoneRect = RectF(s * 0.012f, s * 0.010f, s * 0.988f, s * 0.990f)
-                canvas.drawRoundRect(phoneRect, s * 0.04f, s * 0.04f, framePaint)
-                val notchPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = qrStyle.fgColor
-                    style = Paint.Style.FILL
-                }
-                canvas.drawRoundRect(RectF(s * 0.38f, s * 0.015f, s * 0.62f, s * 0.038f), s * 0.012f, s * 0.012f, notchPaint)
-            }
-            FrameStyle.NeonGlow -> {
-                val framePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = qrStyle.gradientTo
-                    style = Paint.Style.STROKE
-                    strokeWidth = s * 0.015f
-                    setShadowLayer(s * 0.025f, 0f, 0f, qrStyle.gradientTo)
-                }
-                canvas.drawRoundRect(RectF(s * 0.012f, s * 0.012f, s * 0.988f, s * 0.950f), s * 0.03f, s * 0.03f, framePaint)
-                drawBadgePill(
-                    canvas = canvas,
-                    caption = caption,
-                    defaultText = "SCAN NOW",
-                    centerX = s / 2f,
-                    centerY = s * 0.965f,
-                    badgeWidth = s * 0.68f,
-                    badgeHeight = s * 0.060f,
-                    pillColor = qrStyle.gradientTo,
-                    textColor = 0xFF000000.toInt(),
-                    s = s
-                )
-            }
-            FrameStyle.Bracket -> {
-                val bracketPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFF0F172A.toInt()
-                    style = Paint.Style.STROKE
-                    strokeWidth = s * 0.018f
-                    strokeCap = Paint.Cap.ROUND
-                }
-                val cardRect = RectF(s * 0.02f, s * 0.03f, s * 0.98f, s * 0.98f)
-                canvas.drawRoundRect(cardRect, s * 0.04f, s * 0.04f, bracketPaint)
-
-                // 4 Camera corner brackets
-                val cLen = s * 0.08f
-                val bi = s * 0.05f
-                canvas.drawLine(bi, bi + cLen, bi, bi, bracketPaint)
-                canvas.drawLine(bi, bi, bi + cLen, bi, bracketPaint)
-                canvas.drawLine(s - bi - cLen, bi, s - bi, bi, bracketPaint)
-                canvas.drawLine(s - bi, bi, s - bi, bi + cLen, bracketPaint)
-                canvas.drawLine(bi, s - bi - cLen, bi, s - bi, bracketPaint)
-                canvas.drawLine(bi, s - bi, bi + cLen, s - bi, bracketPaint)
-                canvas.drawLine(s - bi - cLen, s - bi, s - bi, s - bi, bracketPaint)
-                canvas.drawLine(s - bi, s - bi - cLen, s - bi, s - bi, bracketPaint)
-
-                // Speech bubble on top
-                val bubblePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFF6366F1.toInt()
-                    style = Paint.Style.FILL
-                }
-                val bw = s * 0.44f
-                val bh = s * 0.08f
-                val bx = (s - bw) / 2f
-                val by = s * 0.01f
-                val bPath = Path().apply {
-                    addRoundRect(RectF(bx, by, bx + bw, by + bh), s * 0.025f, s * 0.025f, Path.Direction.CW)
-                    moveTo(s / 2f - s * 0.025f, by + bh)
-                    lineTo(s / 2f, by + bh + s * 0.02f)
-                    lineTo(s / 2f + s * 0.025f, by + bh)
-                    close()
-                }
-                canvas.drawPath(bPath, bubblePaint)
-                textPaint.textSize = s * 0.038f
-                canvas.drawText(caption.ifEmpty { "SCAN CODE" }, s / 2f, s * 0.065f, textPaint)
-            }
             FrameStyle.Badge -> {
-                val ribbonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFF4C1D95.toInt()
-                    style = Paint.Style.FILL
-                }
-                val rw = s * 0.60f
-                val rh = s * 0.11f
+                // Badge 3: Angled Ribbon Badge
+                val rw = s * 0.62f
+                val rh = s * 0.070f
                 val rx = (s - rw) / 2f
-                val ry = s * 0.87f
+                val ry = s * 0.916f
+
                 val ribbonPath = Path().apply {
                     moveTo(rx, ry)
                     lineTo(rx + rw, ry)
@@ -1548,224 +1222,104 @@ object QrGenerator {
                     lineTo(rx + s * 0.025f, ry + rh / 2f)
                     close()
                 }
+
+                val ribbonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = primaryColor
+                    style = Paint.Style.FILL
+                }
                 canvas.drawPath(ribbonPath, ribbonPaint)
-                canvas.drawText(caption.ifEmpty { "SCAN CODE" }, s / 2f, ry + rh * 0.68f, textPaint)
-            }
-            FrameStyle.Arch -> {
-                val standPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFF3B0764.toInt()
-                    style = Paint.Style.FILL
-                }
-                val standRect = RectF(s * 0.10f, s * 0.86f, s * 0.90f, s * 0.98f)
-                canvas.drawRoundRect(standRect, s * 0.03f, s * 0.03f, standPaint)
-            }
-            FrameStyle.Cup -> {
-                val lidPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFFFFFFFF.toInt()
-                    style = Paint.Style.FILL
-                }
-                val lidStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFF0F172A.toInt()
-                    style = Paint.Style.STROKE
-                    strokeWidth = s * 0.012f
-                }
-                val lidRim = RectF(s * 0.08f, s * 0.08f, s * 0.92f, s * 0.14f)
-                canvas.drawRoundRect(lidRim, s * 0.02f, s * 0.02f, lidPaint)
-                canvas.drawRoundRect(lidRim, s * 0.02f, s * 0.02f, lidStroke)
-                val lidCap = RectF(s * 0.28f, s * 0.03f, s * 0.72f, s * 0.09f)
-                canvas.drawRoundRect(lidCap, s * 0.02f, s * 0.02f, lidPaint)
-                canvas.drawRoundRect(lidCap, s * 0.02f, s * 0.02f, lidStroke)
 
-                val sleeveStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFF0F172A.toInt()
+                val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0x66FFFFFF.toInt()
                     style = Paint.Style.STROKE
-                    strokeWidth = s * 0.012f
+                    strokeWidth = s * 0.003f
                 }
-                canvas.drawRoundRect(RectF(s * 0.07f, s * 0.08f, s * 0.93f, s * 0.88f), s * 0.04f, s * 0.04f, sleeveStroke)
-            }
-            FrameStyle.Card -> {
-                val outlineP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFF0F172A.toInt()
-                    style = Paint.Style.STROKE
-                    strokeWidth = s * 0.015f
-                }
-                canvas.drawRoundRect(RectF(s * 0.03f, s * 0.02f, s * 0.97f, s * 0.98f), s * 0.06f, s * 0.06f, outlineP)
-                canvas.drawRoundRect(RectF(s * 0.05f, s * 0.03f, s * 0.95f, s * 0.86f), s * 0.04f, s * 0.04f, outlineP)
+                canvas.drawPath(ribbonPath, strokePaint)
 
-                val pillRect = RectF(s * 0.18f, s * 0.87f, s * 0.82f, s * 0.97f)
-                val pillFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF06B6D4.toInt(); style = Paint.Style.FILL }
-                canvas.drawRoundRect(pillRect, s * 0.04f, s * 0.04f, pillFill)
-                canvas.drawText(caption.ifEmpty { "SCAN ME" }, s / 2f, s * 0.935f, textPaint)
+                textPaint.textSize = rh * 0.48f
+                val textToDraw = if (caption.trim().isNotEmpty()) caption.trim() else "SCAN ME"
+                val fontMetrics = textPaint.fontMetrics
+                val textY = (ry + rh / 2f) - (fontMetrics.ascent + fontMetrics.descent) / 2f
+                canvas.drawText(textToDraw, s / 2f, textY, textPaint)
             }
             FrameStyle.Label -> {
-                val outlineP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFF0F172A.toInt()
-                    style = Paint.Style.STROKE
-                    strokeWidth = s * 0.015f
-                }
-                canvas.drawRoundRect(RectF(s * 0.03f, s * 0.02f, s * 0.97f, s * 0.98f), s * 0.06f, s * 0.06f, outlineP)
-                canvas.drawRoundRect(RectF(s * 0.05f, s * 0.09f, s * 0.95f, s * 0.95f), s * 0.04f, s * 0.04f, outlineP)
+                // Badge 4: Minimal Tag Badge
+                val bw = s * 0.54f
+                val bh = s * 0.064f
+                val cx = s / 2f
+                val cy = s * 0.048f
+                val tagRect = RectF(cx - bw / 2f, cy - bh / 2f, cx + bw / 2f, cy + bh / 2f)
 
-                val topPill = RectF(s * 0.20f, s * 0.03f, s * 0.80f, s * 0.11f)
-                val topPillP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF1E1B4B.toInt(); style = Paint.Style.FILL }
-                canvas.drawRoundRect(topPill, s * 0.035f, s * 0.035f, topPillP)
-                textPaint.textSize = s * 0.035f
-                canvas.drawText(caption.ifEmpty { "SCAN ME" }, s / 2f, s * 0.08f, textPaint)
-            }
-            FrameStyle.Speech -> {
-                val stitchPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFF0891B2.toInt()
-                    style = Paint.Style.STROKE
-                    strokeWidth = s * 0.008f
-                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(s * 0.018f, s * 0.012f), 0f)
-                }
-                canvas.drawCircle(s / 2f, s * 0.44f, s * 0.45f, stitchPaint)
-            }
-            FrameStyle.Note -> {
-                val fold = s * 0.10f
-                val inset = s * 0.02f
-                val flapPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFFFDE047.toInt()
+                val tagBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0xFF1E293B.toInt()
                     style = Paint.Style.FILL
                 }
-                val flapPath = Path().apply {
-                    moveTo(s - inset - fold, s - inset)
-                    lineTo(s - inset - fold, s - inset - fold)
-                    lineTo(s - inset, s - inset - fold)
-                    close()
-                }
-                canvas.drawPath(flapPath, flapPaint)
+                canvas.drawRoundRect(tagRect, s * 0.018f, s * 0.018f, tagBg)
 
-                val stitchPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFFCA8A04.toInt()
-                    style = Paint.Style.STROKE
-                    strokeWidth = s * 0.007f
-                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(s * 0.016f, s * 0.012f), 0f)
+                val dotP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = primaryColor
+                    style = Paint.Style.FILL
                 }
-                val stitchPath = Path().apply {
-                    val si = inset + s * 0.015f
-                    moveTo(si, si)
-                    lineTo(s - si, si)
-                    lineTo(s - si, s - si - fold)
-                    lineTo(s - si - fold, s - si)
-                    lineTo(si, s - si)
-                    close()
-                }
-                canvas.drawPath(stitchPath, stitchPaint)
+                canvas.drawCircle(cx - bw / 2f + s * 0.03f, cy, s * 0.009f, dotP)
+
+                drawBadgePill(
+                    canvas = canvas,
+                    caption = caption,
+                    defaultText = "SCAN ME",
+                    centerX = cx + s * 0.015f,
+                    centerY = cy,
+                    badgeWidth = bw - s * 0.08f,
+                    badgeHeight = bh,
+                    pillColor = 0x00000000,
+                    textColor = 0xFFFFFFFF.toInt(),
+                    s = s
+                )
             }
-            FrameStyle.Globe -> {
-                val stitchPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFF2563EB.toInt()
-                    style = Paint.Style.STROKE
-                    strokeWidth = s * 0.008f
-                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(s * 0.016f, s * 0.012f), 0f)
-                }
-                canvas.drawCircle(s / 2f, s / 2f, s * 0.47f, stitchPaint)
-            }
-            FrameStyle.Plaque -> {
-                val stitchPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFF4D7C0F.toInt()
-                    style = Paint.Style.STROKE
-                    strokeWidth = s * 0.007f
-                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(s * 0.016f, s * 0.012f), 0f)
-                }
-                val cornerCut = s * 0.08f
-                val pi = s * 0.02f
-                val si = pi + s * 0.015f
-                val sCornerCut = cornerCut - s * 0.005f
-                val stitchPath = Path().apply {
-                    moveTo(si + sCornerCut, si)
-                    lineTo(s - si - sCornerCut, si)
-                    quadTo(s - si, si, s - si, si + sCornerCut)
-                    lineTo(s - si, s - si - sCornerCut)
-                    quadTo(s - si, s - si, s - si - sCornerCut, s - si)
-                    lineTo(si + sCornerCut, s - si)
-                    quadTo(si, s - si, si, s - si - sCornerCut)
-                    lineTo(si, si + sCornerCut)
-                    quadTo(si, si, si + sCornerCut, si)
-                    close()
-                }
-                canvas.drawPath(stitchPath, stitchPaint)
-            }
-            FrameStyle.Pentagon -> {
-                val stitchPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFFBE123C.toInt()
-                    style = Paint.Style.STROKE
-                    strokeWidth = s * 0.007f
-                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(s * 0.016f, s * 0.012f), 0f)
-                }
-                val stitchPath = Path().apply {
-                    moveTo(s * 0.50f, s * 0.03f)
-                    lineTo(s * 0.97f, s * 0.33f)
-                    lineTo(s * 0.86f, s * 0.96f)
-                    lineTo(s * 0.14f, s * 0.96f)
-                    lineTo(s * 0.03f, s * 0.33f)
-                    close()
-                }
-                canvas.drawPath(stitchPath, stitchPaint)
-            }
-            FrameStyle.Hexagon -> {
-                val stitchPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFFB45309.toInt()
-                    style = Paint.Style.STROKE
-                    strokeWidth = s * 0.007f
-                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(s * 0.016f, s * 0.012f), 0f)
-                }
-                val stitchPath = Path().apply {
-                    moveTo(s * 0.50f, s * 0.03f)
-                    lineTo(s * 0.97f, s * 0.26f)
-                    lineTo(s * 0.97f, s * 0.74f)
-                    lineTo(s * 0.50f, s * 0.97f)
-                    lineTo(s * 0.03f, s * 0.74f)
-                    lineTo(s * 0.03f, s * 0.26f)
-                    close()
-                }
-                canvas.drawPath(stitchPath, stitchPaint)
-            }
-            FrameStyle.Diamond -> {
-                val stitchPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = qrStyle.fgColor
-                    style = Paint.Style.STROKE
-                    strokeWidth = s * 0.010f
-                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(s * 0.016f, s * 0.012f), 0f)
-                }
-                val stitchPath = Path().apply {
-                    moveTo(s * 0.50f, s * 0.03f)
-                    lineTo(s * 0.97f, s * 0.50f)
-                    lineTo(s * 0.50f, s * 0.97f)
-                    lineTo(s * 0.03f, s * 0.50f)
-                    close()
-                }
-                canvas.drawPath(stitchPath, stitchPaint)
-            }
-            FrameStyle.Seal -> {
+            FrameStyle.Speech -> {
+                // Badge 5: Speech Bubble Badge
+                val bw = s * 0.56f
+                val bh = s * 0.064f
                 val cx = s / 2f
-                val cy = s / 2f
-                val stitchPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFFB91C1C.toInt()
-                    style = Paint.Style.STROKE
-                    strokeWidth = s * 0.007f
-                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(s * 0.016f, s * 0.012f), 0f)
-                }
-                canvas.drawCircle(cx, cy, s * 0.44f, stitchPaint)
-            }
-            FrameStyle.Bucket -> {
-                val stitchPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFF1D4ED8.toInt()
-                    style = Paint.Style.STROKE
-                    strokeWidth = s * 0.007f
-                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(s * 0.016f, s * 0.012f), 0f)
-                }
-                val stitchPath = Path().apply {
-                    moveTo(s * 0.14f, s * 0.16f)
-                    lineTo(s * 0.86f, s * 0.16f)
-                    lineTo(s * 0.79f, s * 0.90f)
-                    lineTo(s * 0.21f, s * 0.90f)
+                val cy = s * 0.045f
+                val bx = cx - bw / 2f
+                val by = cy - bh / 2f
+
+                val bPath = Path().apply {
+                    addRoundRect(RectF(bx, by, bx + bw, by + bh), s * 0.020f, s * 0.020f, Path.Direction.CW)
+                    moveTo(cx - s * 0.020f, by + bh)
+                    lineTo(cx, by + bh + s * 0.015f)
+                    lineTo(cx + s * 0.020f, by + bh)
                     close()
                 }
-                canvas.drawPath(stitchPath, stitchPaint)
+
+                val bubbleP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = primaryColor
+                    style = Paint.Style.FILL
+                }
+                canvas.drawPath(bPath, bubbleP)
+
+                textPaint.textSize = bh * 0.48f
+                val textToDraw = if (caption.trim().isNotEmpty()) caption.trim() else "SCAN ME"
+                val fontMetrics = textPaint.fontMetrics
+                val textY = cy - (fontMetrics.ascent + fontMetrics.descent) / 2f
+                canvas.drawText(textToDraw, cx, textY, textPaint)
             }
-            else -> {}
+            FrameStyle.None -> {}
+            else -> {
+                // Fallback for legacy badges: clean bottom capsule
+                drawBadgePill(
+                    canvas = canvas,
+                    caption = caption,
+                    defaultText = "SCAN ME",
+                    centerX = s / 2f,
+                    centerY = s * 0.952f,
+                    badgeWidth = s * 0.60f,
+                    badgeHeight = s * 0.068f,
+                    pillColor = primaryColor,
+                    textColor = 0xFFFFFFFF.toInt(),
+                    s = s
+                )
+            }
         }
     }
 

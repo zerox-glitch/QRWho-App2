@@ -12,17 +12,36 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import android.util.Size
+import java.net.URLDecoder
+import android.view.MotionEvent
+import android.view.ScaleGestureDetector
+import android.hardware.camera2.CaptureRequest
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.OptIn
+import androidx.camera.camera2.interop.Camera2Interop
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
+import androidx.camera.core.CameraControl
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ExperimentalGetImage
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -42,6 +61,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -50,7 +70,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CameraAlt
@@ -70,6 +93,8 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -92,6 +117,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -119,6 +145,14 @@ import com.example.ui.theme.SurfaceDark
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.IntOffset
+import com.google.android.gms.tasks.Tasks
+import com.google.mlkit.vision.barcode.BarcodeScanner
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.common.InputImage
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.DecodeHintType
@@ -178,12 +212,49 @@ fun ScannerScreen(
     var cameraControl by remember { mutableStateOf<androidx.camera.core.CameraControl?>(null) }
     var isTorchOn by remember { mutableStateOf(false) }
 
+    // Distance Zoom & Tap-to-Focus Controls
+    var currentZoomRatio by remember { mutableStateOf(1f) }
+    var minZoomRatio by remember { mutableStateOf(1f) }
+    var maxZoomRatio by remember { mutableStateOf(5f) }
+    var focusPoint by remember { mutableStateOf<Offset?>(null) }
+    var showFocusRing by remember { mutableStateOf(false) }
+
+    // Google ML Kit Barcode Scanner client (Hardware-accelerated neural scanner)
+    val barcodeScanner = remember {
+        val options = BarcodeScannerOptions.Builder()
+            .setBarcodeFormats(
+                Barcode.FORMAT_ALL_FORMATS
+            )
+            .build()
+        BarcodeScanning.getClient(options)
+    }
+
+    DisposableEffect(barcodeScanner) {
+        onDispose {
+            try {
+                barcodeScanner.close()
+            } catch (_: Exception) {}
+        }
+    }
+
     val isCameraScanningPaused by rememberUpdatedState(isBatchMode && isBatchPaused)
 
     var scannedResult by remember { mutableStateOf<String?>(null) }
     var scannedPhotoThumbnail by remember { mutableStateOf<Bitmap?>(null) }
     var isAnalyzingPhoto by remember { mutableStateOf(false) }
     var scanErrorMessage by remember { mutableStateOf<String?>(null) }
+    var showDetailsPagePayload by remember { mutableStateOf<String?>(null) }
+
+    if (showDetailsPagePayload != null) {
+        ScannedContentDetailsPage(
+            rawText = showDetailsPagePayload!!,
+            photoThumbnail = scannedPhotoThumbnail,
+            onBack = { showDetailsPagePayload = null },
+            viewModel = viewModel,
+            onNavigateToStudio = onNavigateToStudio
+        )
+        return
+    }
 
     val vibrator = remember {
         try {
@@ -335,130 +406,161 @@ fun ScannerScreen(
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
-                    val previewView = PreviewView(ctx)
-                    val cameraExecutor = Executors.newSingleThreadExecutor()
+                    val previewView = PreviewView(ctx).apply {
+                        implementationMode = PreviewView.ImplementationMode.PERFORMANCE
+                        scaleType = PreviewView.ScaleType.FILL_CENTER
+                    }
+                    val cameraExecutor = Executors.newSingleThreadExecutor { runnable ->
+                        Thread {
+                            try {
+                                android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_DISPLAY)
+                            } catch (_: Exception) {}
+                            runnable.run()
+                        }.apply {
+                            name = "FastCameraScannerThread"
+                            priority = Thread.MAX_PRIORITY
+                        }
+                    }
                     val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
+
+                    // Touch gestures on camera view: Smooth pinch-to-zoom + Tap-to-focus
+                    val scaleGestureDetector = ScaleGestureDetector(ctx, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                        override fun onScale(detector: ScaleGestureDetector): Boolean {
+                            cameraControl?.let { ctrl ->
+                                val target = (currentZoomRatio * detector.scaleFactor).coerceIn(minZoomRatio, maxZoomRatio)
+                                ctrl.setZoomRatio(target)
+                                currentZoomRatio = target
+                            }
+                            return true
+                        }
+                    })
+
+                    previewView.setOnTouchListener { _, event ->
+                        scaleGestureDetector.onTouchEvent(event)
+                        if (event.action == MotionEvent.ACTION_UP && !scaleGestureDetector.isInProgress) {
+                            val factory = previewView.meteringPointFactory
+                            val point = factory.createPoint(event.x, event.y)
+                            val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
+                                .setAutoCancelDuration(3, java.util.concurrent.TimeUnit.SECONDS)
+                                .build()
+                            cameraControl?.startFocusAndMetering(action)
+                            focusPoint = Offset(event.x, event.y)
+                            showFocusRing = true
+                            coroutineScope.launch {
+                                kotlinx.coroutines.delay(1200L)
+                                showFocusRing = false
+                            }
+                        }
+                        true
+                    }
 
                     cameraProviderFuture.addListener({
                         val cameraProvider = cameraProviderFuture.get()
-                        val preview = Preview.Builder().build().also {
+
+                        // High-Quality Resolution Selector for native camera clarity and extended distance
+                        val resolutionSelector = ResolutionSelector.Builder()
+                            .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
+                            .setResolutionStrategy(
+                                ResolutionStrategy(
+                                    Size(1920, 1080),
+                                    ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
+                                )
+                            )
+                            .build()
+
+                        // 1080p Full HD Preview with Camera2 Continuous Picture AF & Edge Sharpness
+                        val previewBuilder = Preview.Builder()
+                            .setResolutionSelector(resolutionSelector)
+
+                        @OptIn(ExperimentalCamera2Interop::class)
+                        val camera2PreviewExtender = Camera2Interop.Extender(previewBuilder)
+                        camera2PreviewExtender.setCaptureRequestOption(
+                            CaptureRequest.CONTROL_AF_MODE,
+                            CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE
+                        )
+                        camera2PreviewExtender.setCaptureRequestOption(
+                            CaptureRequest.CONTROL_AE_MODE,
+                            CaptureRequest.CONTROL_AE_MODE_ON
+                        )
+                        camera2PreviewExtender.setCaptureRequestOption(
+                            CaptureRequest.CONTROL_AWB_MODE,
+                            CaptureRequest.CONTROL_AWB_MODE_AUTO
+                        )
+                        camera2PreviewExtender.setCaptureRequestOption(
+                            CaptureRequest.CONTROL_AE_ANTIBANDING_MODE,
+                            CaptureRequest.CONTROL_AE_ANTIBANDING_MODE_AUTO
+                        )
+                        camera2PreviewExtender.setCaptureRequestOption(
+                            CaptureRequest.EDGE_MODE,
+                            CaptureRequest.EDGE_MODE_HIGH_QUALITY
+                        )
+                        camera2PreviewExtender.setCaptureRequestOption(
+                            CaptureRequest.NOISE_REDUCTION_MODE,
+                            CaptureRequest.NOISE_REDUCTION_MODE_HIGH_QUALITY
+                        )
+
+                        val preview = previewBuilder.build().also {
                             it.setSurfaceProvider(previewView.surfaceProvider)
                         }
 
-                        val imageAnalysis = ImageAnalysis.Builder()
-                            .setTargetResolution(Size(1280, 720))
+                        // 1080p ImageAnalysis with zero-copy hardware buffer feeding Google ML Kit
+                        val analysisBuilder = ImageAnalysis.Builder()
+                            .setResolutionSelector(resolutionSelector)
                             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                            .build()
+                            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
 
-                        val reader = MultiFormatReader()
-                        val hints = mapOf<DecodeHintType, Any>(
-                            DecodeHintType.POSSIBLE_FORMATS to listOf(BarcodeFormat.QR_CODE),
-                            DecodeHintType.TRY_HARDER to true,
-                            DecodeHintType.CHARACTER_SET to "UTF-8"
+                        @OptIn(ExperimentalCamera2Interop::class)
+                        val camera2AnalysisExtender = Camera2Interop.Extender(analysisBuilder)
+                        camera2AnalysisExtender.setCaptureRequestOption(
+                            CaptureRequest.CONTROL_AF_MODE,
+                            CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE
                         )
-                        reader.setHints(hints)
-                        var lastAnalysisTime = 0L
+                        camera2AnalysisExtender.setCaptureRequestOption(
+                            CaptureRequest.EDGE_MODE,
+                            CaptureRequest.EDGE_MODE_HIGH_QUALITY
+                        )
+                        camera2AnalysisExtender.setCaptureRequestOption(
+                            CaptureRequest.NOISE_REDUCTION_MODE,
+                            CaptureRequest.NOISE_REDUCTION_MODE_HIGH_QUALITY
+                        )
+
+                        val imageAnalysis = analysisBuilder.build()
+
+                        var isProcessingFrame = false
 
                         imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
-                            // When user pauses batch scanning, immediately close frame without CPU heavy processing
-                            if (isCameraScanningPaused) {
+                            if (isCameraScanningPaused || isProcessingFrame) {
                                 imageProxy.close()
                                 return@setAnalyzer
                             }
 
-                            val currentTime = System.currentTimeMillis()
-                            // 60ms cadence: fast, responsive scanning matching native camera apps
-                            if (currentTime - lastAnalysisTime >= 60L) {
-                                lastAnalysisTime = currentTime
-                                val buffer = imageProxy.planes[0].buffer
-                                val bytes = ByteArray(buffer.remaining())
-                                buffer.get(bytes)
-                                val origW = imageProxy.width
-                                val origH = imageProxy.height
-                                val rotation = imageProxy.imageInfo.rotationDegrees
-
-                                // Rotate buffer according to camera sensor rotation
-                                val (rotatedBytes, dims) = rotateYuvSensorBuffer(bytes, origW, origH, rotation)
-                                val w = dims.first
-                                val h = dims.second
-
-                                // Center viewfinder crop (72% center crop where user is pointing)
-                                val cropSize = (minOf(w, h) * 0.72f).toInt()
-                                val cropX = (w - cropSize) / 2
-                                val cropY = (h - cropSize) / 2
-
-                                var decodedText: String? = null
-
-                                // Pass 1: Center Crop with HybridBinarizer (Ultra-fast primary pass)
-                                try {
-                                    val centerSource = PlanarYUVLuminanceSource(
-                                        rotatedBytes, w, h, cropX, cropY, cropSize, cropSize, false
-                                    )
-                                    val res = reader.decodeWithState(BinaryBitmap(HybridBinarizer(centerSource)))
-                                    decodedText = res.text
-                                } catch (_: Exception) {
-                                    reader.reset()
-                                }
-
-                                // Pass 2: Center Crop Inverted (Dark mode / light modules on dark background)
-                                if (decodedText.isNullOrEmpty()) {
-                                    try {
-                                        val centerSource = PlanarYUVLuminanceSource(
-                                            rotatedBytes, w, h, cropX, cropY, cropSize, cropSize, false
-                                        )
-                                        val res = reader.decodeWithState(BinaryBitmap(HybridBinarizer(centerSource.invert())))
-                                        decodedText = res.text
-                                    } catch (_: Exception) {
-                                        reader.reset()
-                                    }
-                                }
-
-                                // Pass 3: Center Crop GlobalHistogramBinarizer (Soft lighting, shadows, gradients)
-                                if (decodedText.isNullOrEmpty()) {
-                                    try {
-                                        val centerSource = PlanarYUVLuminanceSource(
-                                            rotatedBytes, w, h, cropX, cropY, cropSize, cropSize, false
-                                        )
-                                        val res = reader.decodeWithState(BinaryBitmap(GlobalHistogramBinarizer(centerSource)))
-                                        decodedText = res.text
-                                    } catch (_: Exception) {
-                                        reader.reset()
-                                    }
-                                }
-
-                                // Pass 4: Full Frame HybridBinarizer (Codes held at edges of screen)
-                                if (decodedText.isNullOrEmpty()) {
-                                    try {
-                                        val fullSource = PlanarYUVLuminanceSource(
-                                            rotatedBytes, w, h, 0, 0, w, h, false
-                                        )
-                                        val res = reader.decodeWithState(BinaryBitmap(HybridBinarizer(fullSource)))
-                                        decodedText = res.text
-                                    } catch (_: Exception) {
-                                        reader.reset()
-                                    }
-                                }
-
-                                // Pass 5: Full Frame Inverted
-                                if (decodedText.isNullOrEmpty()) {
-                                    try {
-                                        val fullSource = PlanarYUVLuminanceSource(
-                                            rotatedBytes, w, h, 0, 0, w, h, false
-                                        )
-                                        val res = reader.decodeWithState(BinaryBitmap(HybridBinarizer(fullSource.invert())))
-                                        decodedText = res.text
-                                    } catch (_: Exception) {
-                                        reader.reset()
-                                    }
-                                }
-
-                                if (!decodedText.isNullOrEmpty()) {
-                                    ContextCompat.getMainExecutor(ctx).execute {
-                                        handleScannedCode(decodedText, null, fromLiveCamera = true)
-                                    }
-                                }
+                            @OptIn(ExperimentalGetImage::class)
+                            val mediaImage = imageProxy.image
+                            if (mediaImage == null) {
+                                imageProxy.close()
+                                return@setAnalyzer
                             }
-                            imageProxy.close()
+
+                            isProcessingFrame = true
+                            val rotation = imageProxy.imageInfo.rotationDegrees
+                            val inputImage = InputImage.fromMediaImage(mediaImage, rotation)
+
+                            barcodeScanner.process(inputImage)
+                                .addOnSuccessListener { barcodes ->
+                                    if (barcodes.isNotEmpty()) {
+                                        val best = barcodes.firstOrNull { !it.rawValue.isNullOrBlank() }
+                                        val text = best?.rawValue ?: best?.displayValue
+                                        if (!text.isNullOrBlank()) {
+                                            ContextCompat.getMainExecutor(ctx).execute {
+                                                handleScannedCode(text, null, fromLiveCamera = true)
+                                            }
+                                        }
+                                    }
+                                }
+                                .addOnCompleteListener {
+                                    isProcessingFrame = false
+                                    imageProxy.close()
+                                }
                         }
 
                         val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
@@ -471,6 +573,27 @@ fun ScannerScreen(
                                 imageAnalysis
                             )
                             cameraControl = camera.cameraControl
+                            camera.cameraInfo.zoomState.observe(ctx as androidx.lifecycle.LifecycleOwner) { state ->
+                                if (state != null) {
+                                    currentZoomRatio = state.zoomRatio
+                                    minZoomRatio = state.minZoomRatio
+                                    maxZoomRatio = state.maxZoomRatio
+                                }
+                            }
+
+                            // Trigger immediate center auto-focus and auto-exposure
+                            previewView.post {
+                                val cx = previewView.width / 2f
+                                val cy = previewView.height / 2f
+                                if (cx > 0 && cy > 0) {
+                                    val factory = previewView.meteringPointFactory
+                                    val point = factory.createPoint(cx, cy)
+                                    val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
+                                        .setAutoCancelDuration(3, java.util.concurrent.TimeUnit.SECONDS)
+                                        .build()
+                                    cameraControl?.startFocusAndMetering(action)
+                                }
+                            }
                         } catch (_: Exception) {}
                     }, ContextCompat.getMainExecutor(ctx))
 
@@ -483,6 +606,17 @@ fun ScannerScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
+                val infiniteTransition = rememberInfiniteTransition(label = "scanner_laser")
+                val laserProgress by infiniteTransition.animateFloat(
+                    initialValue = 0.08f,
+                    targetValue = 0.92f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1800, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "laser_y"
+                )
+
                 val reticleBorderColor = when {
                     isBatchMode && isBatchPaused -> Color(0xFFF59E0B)
                     batchFlashPulse -> EmeraldGreen
@@ -505,6 +639,32 @@ fun ScannerScreen(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
+                    // Animated Laser Scanning Sweep Line
+                    if (!isCameraScanningPaused) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .fillMaxHeight(laserProgress)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(2.5.dp)
+                                    .align(Alignment.BottomCenter)
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            listOf(
+                                                Color.Transparent,
+                                                reticleBorderColor.copy(alpha = 0.6f),
+                                                reticleBorderColor,
+                                                reticleBorderColor.copy(alpha = 0.6f),
+                                                Color.Transparent
+                                            )
+                                        )
+                                    )
+                            )
+                        }
+                    }
                     // Top tag of reticle for Batch Mode
                     if (isBatchMode) {
                         Surface(
@@ -599,6 +759,92 @@ fun ScannerScreen(
                             }
                         }
                     }
+                }
+            }
+
+            // Tap-to-focus Animated Bracket Ring
+            if (showFocusRing && focusPoint != null) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    Box(
+                        modifier = Modifier
+                            .offset {
+                                IntOffset(
+                                    focusPoint!!.x.toInt() - 30.dp.roundToPx(),
+                                    focusPoint!!.y.toInt() - 30.dp.roundToPx()
+                                )
+                            }
+                            .size(60.dp)
+                            .border(2.dp, ElectricCyan, RoundedCornerShape(10.dp))
+                    )
+                }
+            }
+
+            // Distance Zoom Controls & Status Pill
+            val zoomPresets = remember(minZoomRatio, maxZoomRatio) {
+                val list = mutableListOf(1f)
+                if (2f in minZoomRatio..maxZoomRatio) list.add(2f)
+                if (3f in minZoomRatio..maxZoomRatio) list.add(3f)
+                if (5f in minZoomRatio..maxZoomRatio) list.add(5f)
+                list
+            }
+
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = if (isBatchMode) 92.dp else 115.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Zoom presets row: 1x, 2x, 3x, 5x
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = Color.Black.copy(alpha = 0.72f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        zoomPresets.forEach { zoomLevel ->
+                            val isSelected = kotlin.math.abs(currentZoomRatio - zoomLevel) < 0.25f
+                            Box(
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isSelected) ElectricCyan else Color.Transparent)
+                                    .clickable {
+                                        currentZoomRatio = zoomLevel
+                                        cameraControl?.setZoomRatio(zoomLevel)
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "${zoomLevel.toInt()}x",
+                                    color = if (isSelected) Color.Black else TextPrimary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Helper tooltip for distance scanning & pinch-to-zoom
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.Black.copy(alpha = 0.65f),
+                    border = androidx.compose.foundation.BorderStroke(0.5.dp, CardBorder)
+                ) {
+                    Text(
+                        text = if (currentZoomRatio > 1.2f) "⚡ Distance Zoom: ${String.format(java.util.Locale.US, "%.1fx", currentZoomRatio)}"
+                               else "💡 Tap 2x/3x for far-away codes • Pinch to zoom",
+                        color = if (currentZoomRatio > 1.2f) ElectricCyan else TextSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                    )
                 }
             }
         } else {
@@ -1073,43 +1319,88 @@ fun ScannerScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Primary Action Button (Prominent, High-Contrast)
-                    Button(
-                        onClick = {
-                            QrContentParser.openPrimaryAction(context, text, parsedAction) { toastMsg ->
-                                clipboardManager.setText(AnnotatedString(parsedAction.copyableText))
-                                Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (parsedAction.isLocation) ElectricCyan else EmeraldGreen,
-                            contentColor = Color.Black
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(42.dp)
-                            .testTag("scanner_primary_action_button")
+                    // Action Buttons Row: Primary Action + View Full Contents
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = parsedAction.primaryButtonIcon,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = parsedAction.primaryButtonLabel,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
+                        // Primary Action Button (Open Link / Connect / Call)
+                        Button(
+                            onClick = {
+                                QrContentParser.openPrimaryAction(context, text, parsedAction) { toastMsg ->
+                                    clipboardManager.setText(AnnotatedString(parsedAction.copyableText))
+                                    Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (parsedAction.isLocation) ElectricCyan else EmeraldGreen,
+                                contentColor = Color.Black
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                            modifier = Modifier
+                                .weight(1.2f)
+                                .height(46.dp)
+                                .testTag("scanner_primary_action_button")
+                        ) {
+                            Icon(
+                                imageVector = parsedAction.primaryButtonIcon,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = parsedAction.primaryButtonLabel,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.5.sp,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                        }
+
+                        // Dedicated "View Full Contents" Page Button
+                        Button(
+                            onClick = {
+                                showDetailsPagePayload = text
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = ElectricCyan.copy(alpha = 0.18f),
+                                contentColor = ElectricCyan
+                            ),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, ElectricCyan.copy(alpha = 0.6f)),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(46.dp)
+                                .testTag("scanner_view_contents_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Visibility,
+                                contentDescription = "View Contents",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "View Contents",
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     // Secondary Action Buttons Row: Remake in Studio + Copy + Done
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Remake in Studio Button
                         Button(
@@ -1122,14 +1413,14 @@ fun ScannerScreen(
                                 contentColor = ElectricCyan
                             ),
                             shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
                             modifier = Modifier
                                 .weight(1f)
-                                .height(36.dp)
+                                .height(38.dp)
                         ) {
                             Icon(Icons.Default.AutoAwesome, contentDescription = "Remake", modifier = Modifier.size(13.dp), tint = ElectricCyan)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Remake", fontWeight = FontWeight.SemiBold, fontSize = 11.5.sp, color = ElectricCyan)
+                            Text("Remake", fontWeight = FontWeight.SemiBold, fontSize = 11.5.sp, color = ElectricCyan, maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                         }
 
                         // Copy Action Button
@@ -1143,10 +1434,10 @@ fun ScannerScreen(
                                 contentColor = TextPrimary
                             ),
                             shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
                             modifier = Modifier
                                 .weight(1f)
-                                .height(36.dp)
+                                .height(38.dp)
                         ) {
                             Icon(
                                 imageVector = parsedAction.secondaryButtonIcon,
@@ -1154,7 +1445,7 @@ fun ScannerScreen(
                                 modifier = Modifier.size(13.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(parsedAction.secondaryButtonLabel, fontSize = 11.5.sp, fontWeight = FontWeight.Medium)
+                            Text(parsedAction.secondaryButtonLabel, fontSize = 11.5.sp, fontWeight = FontWeight.Medium, maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                         }
 
                         // Stop Camera / Done
@@ -1165,12 +1456,12 @@ fun ScannerScreen(
                                 contentColor = TextPrimary
                             ),
                             shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                             modifier = Modifier
                                 .weight(0.8f)
-                                .height(36.dp)
+                                .height(38.dp)
                         ) {
-                            Text("Done", fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
+                            Text("Done", fontWeight = FontWeight.Bold, fontSize = 11.5.sp, maxLines = 1, softWrap = false)
                         }
                     }
                 }
@@ -1653,12 +1944,29 @@ fun ScannerScreen(
 
                                         Spacer(modifier = Modifier.height(8.dp))
 
-                                        // Action buttons
+                                         // Action buttons
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.End,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
+                                            // View Full Contents
+                                            FilledTonalButton(
+                                                onClick = {
+                                                    showDetailsPagePayload = item.text
+                                                },
+                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                shape = RoundedCornerShape(6.dp),
+                                                colors = ButtonDefaults.filledTonalButtonColors(containerColor = ElectricCyan.copy(alpha = 0.15f), contentColor = ElectricCyan),
+                                                modifier = Modifier.height(26.dp)
+                                            ) {
+                                                Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(11.dp))
+                                                Spacer(modifier = Modifier.width(3.dp))
+                                                Text("View", fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                                            }
+
+                                            Spacer(modifier = Modifier.width(4.dp))
+
                                             // Copy
                                             FilledTonalButton(
                                                 onClick = {
@@ -1776,7 +2084,29 @@ private fun decodeQrFromGalleryUri(context: Context, uri: Uri): DecodedPhotoResu
             null
         }
 
-        // Step 2: Try multi-pass detection on the scaled photo
+        // Primary Step: Google ML Kit Barcode Scanner (Fast deep learning, angle & distance resilient)
+        try {
+            val inputImage = InputImage.fromBitmap(bitmap, 0)
+            val scanner = BarcodeScanning.getClient(
+                BarcodeScannerOptions.Builder()
+                    .setBarcodeFormats(
+                        Barcode.FORMAT_QR_CODE,
+                        Barcode.FORMAT_DATA_MATRIX,
+                        Barcode.FORMAT_AZTEC,
+                        Barcode.FORMAT_PDF417
+                    )
+                    .build()
+            )
+            val task = scanner.process(inputImage)
+            val barcodes = Tasks.await(task, 2500, java.util.concurrent.TimeUnit.MILLISECONDS)
+            val best = barcodes.firstOrNull { !it.rawValue.isNullOrBlank() }
+            val mlText = best?.rawValue ?: best?.displayValue
+            if (!mlText.isNullOrBlank()) {
+                return DecodedPhotoResult(mlText, thumbnail)
+            }
+        } catch (_: Exception) {}
+
+        // Step 2: Fallback to multi-pass detection on the scaled photo
         val decoded1 = scanQrMultiPass(bitmap)
         if (!decoded1.isNullOrEmpty()) {
             return DecodedPhotoResult(decoded1, thumbnail)
@@ -2013,6 +2343,404 @@ private fun rotateYuvSensorBuffer(data: ByteArray, width: Int, height: Int, rota
             return Pair(rotated, Pair(height, width))
         }
         else -> return Pair(data, Pair(width, height))
+    }
+}
+
+/**
+ * Dedicated full-page view for inspecting all parsed fields and raw data of a scanned QR code.
+ */
+@Composable
+fun ScannedContentDetailsPage(
+    rawText: String,
+    photoThumbnail: Bitmap?,
+    onBack: () -> Unit,
+    viewModel: StudioViewModel,
+    onNavigateToStudio: () -> Unit
+) {
+    val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
+    val parsedAction = remember(rawText) { QrContentParser.parse(rawText) }
+
+    BackHandler {
+        onBack()
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BgDark)
+            .statusBarsPadding()
+    ) {
+        // Top Navigation Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { onBack() }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(SurfaceDark)
+                        .border(1.dp, CardBorder, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(18.dp))
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text("Scanned QR Contents", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+                    Text(parsedAction.badgeLabel, color = ElectricCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            // Quick Actions
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                IconButton(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, rawText)
+                        }
+                        context.startActivity(Intent.createChooser(intent, "Share QR Payload"))
+                    },
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(SurfaceDark)
+                        .border(1.dp, CardBorder, CircleShape)
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = "Share", tint = TextPrimary, modifier = Modifier.size(16.dp))
+                }
+
+                IconButton(
+                    onClick = {
+                        clipboardManager.setText(AnnotatedString(rawText))
+                        Toast.makeText(context, "Copied full raw QR content!", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(SurfaceDark)
+                        .border(1.dp, CardBorder, CircleShape)
+                ) {
+                    Icon(Icons.Default.ContentCopy, contentDescription = "Copy", tint = TextPrimary, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(bottom = 24.dp)
+        ) {
+            // Header Hero Banner
+            item {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = CardDark,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (photoThumbnail != null) {
+                            Image(
+                                bitmap = photoThumbnail.asImageBitmap(),
+                                contentDescription = "Scanned thumbnail",
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .border(1.dp, CardBorder, RoundedCornerShape(12.dp))
+                            )
+                            Spacer(modifier = Modifier.width(14.dp))
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(ElectricCyan.copy(alpha = 0.15f))
+                                    .border(1.dp, ElectricCyan.copy(alpha = 0.4f), RoundedCornerShape(12.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = parsedAction.primaryButtonIcon,
+                                    contentDescription = null,
+                                    tint = ElectricCyan,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(14.dp))
+                        }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = parsedAction.title,
+                                color = TextPrimary,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = parsedAction.subtitle,
+                                color = TextSecondary,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            // Structured Key-Value Fields Section
+            item {
+                Text("PARSED STRUCTURED FIELDS", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = CardDark,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        when (parsedAction.kind) {
+                            PayloadKind.WIFI -> {
+                                val ssid = Regex("S:([^;]+)").find(rawText)?.groupValues?.get(1) ?: "N/A"
+                                val pwd = Regex("P:([^;]+)").find(rawText)?.groupValues?.get(1) ?: "None (Open)"
+                                val enc = Regex("T:([^;]+)").find(rawText)?.groupValues?.get(1) ?: "WPA"
+                                val isH = rawText.contains("H:true", ignoreCase = true)
+
+                                DetailRow("Network SSID", ssid, canCopy = true)
+                                DetailRow("Security Type", enc)
+                                DetailRow("Wi-Fi Password", pwd, isPassword = pwd != "None (Open)", canCopy = pwd != "None (Open)")
+                                DetailRow("Hidden SSID", if (isH) "Yes (Hidden)" else "No (Broadcasting)")
+                            }
+                            PayloadKind.VCARD -> {
+                                val fn = Regex("FN:([^\r\n]+)").find(rawText)?.groupValues?.get(1) ?: "Contact"
+                                val tel = Regex("TEL[^:]*:([^\r\n]+)").find(rawText)?.groupValues?.get(1) ?: ""
+                                val email = Regex("EMAIL[^:]*:([^\r\n]+)").find(rawText)?.groupValues?.get(1) ?: ""
+                                val org = Regex("ORG:([^\r\n]+)").find(rawText)?.groupValues?.get(1) ?: ""
+                                val title = Regex("TITLE:([^\r\n]+)").find(rawText)?.groupValues?.get(1) ?: ""
+                                val url = Regex("URL:([^\r\n]+)").find(rawText)?.groupValues?.get(1) ?: ""
+
+                                if (fn.isNotEmpty()) DetailRow("Name", fn, canCopy = true)
+                                if (tel.isNotEmpty()) DetailRow("Phone Number", tel, canCopy = true)
+                                if (email.isNotEmpty()) DetailRow("Email Address", email, canCopy = true)
+                                if (org.isNotEmpty()) DetailRow("Organization", org, canCopy = true)
+                                if (title.isNotEmpty()) DetailRow("Job Title", title, canCopy = true)
+                                if (url.isNotEmpty()) DetailRow("Website", url, canCopy = true)
+                            }
+                            PayloadKind.EMAIL -> {
+                                val email = rawText.removePrefix("mailto:").substringBefore("?")
+                                val subject = Regex("subject=([^&]+)", RegexOption.IGNORE_CASE).find(rawText)?.groupValues?.get(1)?.let { try { URLDecoder.decode(it, "UTF-8") } catch (_: Exception) { it } } ?: ""
+                                val body = Regex("body=([^&]+)", RegexOption.IGNORE_CASE).find(rawText)?.groupValues?.get(1)?.let { try { URLDecoder.decode(it, "UTF-8") } catch (_: Exception) { it } } ?: ""
+
+                                DetailRow("To Email", email, canCopy = true)
+                                if (subject.isNotEmpty()) DetailRow("Subject", subject, canCopy = true)
+                                if (body.isNotEmpty()) DetailRow("Message Body", body, canCopy = true)
+                            }
+                            PayloadKind.EVENT -> {
+                                val summary = Regex("SUMMARY:([^\r\n]+)").find(rawText)?.groupValues?.get(1) ?: "Event"
+                                val loc = Regex("LOCATION:([^\r\n]+)").find(rawText)?.groupValues?.get(1) ?: ""
+                                val start = Regex("DTSTART:([^\r\n]+)").find(rawText)?.groupValues?.get(1) ?: ""
+                                val end = Regex("DTEND:([^\r\n]+)").find(rawText)?.groupValues?.get(1) ?: ""
+                                val desc = Regex("DESCRIPTION:([^\r\n]+)").find(rawText)?.groupValues?.get(1) ?: ""
+
+                                DetailRow("Event Title", summary, canCopy = true)
+                                if (start.isNotEmpty()) DetailRow("Starts", start)
+                                if (end.isNotEmpty()) DetailRow("Ends", end)
+                                if (loc.isNotEmpty()) DetailRow("Location", loc, canCopy = true)
+                                if (desc.isNotEmpty()) DetailRow("Description", desc, canCopy = true)
+                            }
+                            else -> {
+                                DetailRow("Payload Type", parsedAction.badgeLabel)
+                                DetailRow("Parsed Action Value", parsedAction.subtitle, canCopy = true)
+                                DetailRow("Total Length", "${rawText.length} characters")
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+
+            // Full Raw Unencoded QR Code Payload Box
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("FULL RAW QR PAYLOAD", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("${rawText.length} bytes • UTF-8", color = ElectricCyan, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color.Black.copy(alpha = 0.85f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        SelectionContainer {
+                            Text(
+                                text = rawText,
+                                color = EmeraldGreen,
+                                fontSize = 12.5.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Button(
+                            onClick = {
+                                clipboardManager.setText(AnnotatedString(rawText))
+                                Toast.makeText(context, "Copied raw QR payload to clipboard!", Toast.LENGTH_SHORT).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark, contentColor = TextPrimary),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Copy Raw Payload", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+
+        // Bottom Primary Actions Bar
+        Surface(
+            color = CardDark,
+            border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Primary Action Button (Open Link / Connect / Call)
+                Button(
+                    onClick = {
+                        QrContentParser.openPrimaryAction(context, rawText, parsedAction) { toastMsg ->
+                            clipboardManager.setText(AnnotatedString(parsedAction.copyableText))
+                            Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ElectricCyan, contentColor = Color.Black),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .weight(1.2f)
+                        .height(44.dp)
+                ) {
+                    Icon(parsedAction.primaryButtonIcon, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(parsedAction.primaryButtonLabel, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+
+                // Remake in Studio Button
+                Button(
+                    onClick = {
+                        viewModel.onScannedFromCamera(rawText)
+                        onNavigateToStudio()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark, contentColor = ElectricCyan),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, ElectricCyan.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp)
+                ) {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp), tint = ElectricCyan)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Remake Art", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = ElectricCyan)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailRow(
+    label: String,
+    value: String,
+    isPassword: Boolean = false,
+    canCopy: Boolean = false
+) {
+    val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
+    var showPass by remember { mutableStateOf(!isPassword) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(label, color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(2.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (isPassword && !showPass) "••••••••" else value,
+                color = TextPrimary,
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (isPassword) {
+                    IconButton(
+                        onClick = { showPass = !showPass },
+                        modifier = Modifier.size(26.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (showPass) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = "Toggle Pass",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(15.dp)
+                        )
+                    }
+                }
+
+                if (canCopy) {
+                    IconButton(
+                        onClick = {
+                            clipboardManager.setText(AnnotatedString(value))
+                            Toast.makeText(context, "Copied $label!", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.size(26.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = "Copy $label",
+                            tint = ElectricCyan,
+                            modifier = Modifier.size(15.dp)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -34,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -45,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -58,6 +60,7 @@ import com.example.qr.engine.QrPayload
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.CardDark
 import com.example.ui.theme.ElectricCyan
+import com.example.ui.theme.NeonViolet
 import com.example.ui.theme.SurfaceDark
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
@@ -70,6 +73,7 @@ fun ContentTab(
     modifier: Modifier = Modifier
 ) {
     val chipScrollState = rememberScrollState()
+    var showWifiPassword by remember { mutableStateOf(false) }
 
     val kinds = listOf(
         Pair(PayloadKind.URL, Icons.Default.Language),
@@ -127,35 +131,140 @@ fun ContentTab(
                 )
                 Spacer(modifier = Modifier.height(10.dp))
 
-                var showPassword by remember { mutableStateOf(false) }
-                OutlinedTextField(
-                    value = payload.wifiPassword,
-                    onValueChange = { onPayloadChange(payload.copy(wifiPassword = it)) },
-                    label = { Text("Password", color = TextSecondary, fontSize = 13.sp) },
-                    singleLine = true,
-                    visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
-                    trailingIcon = {
-                        IconButton(onClick = { showPassword = !showPassword }) {
-                            Icon(
-                                imageVector = if (showPassword) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                contentDescription = "Toggle password",
-                                tint = TextMuted
-                            )
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("wifi_password_input"),
-                    colors = customTextFieldColors()
+                // Network Security / Encryption Selector
+                Text("Network Security Type", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(6.dp))
+
+                val secOptions = listOf(
+                    "WPA" to "WPA / WPA2 / WPA3",
+                    "WEP" to "WEP (Old Network)",
+                    "WPS" to "WPS (PIN / Push)",
+                    "nopass" to "Open (No Pass)"
                 )
 
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    secOptions.forEach { (typeKey, typeLabel) ->
+                        val isSel = payload.wifiEncryption.equals(typeKey, ignoreCase = true) ||
+                                (typeKey == "WPA" && (payload.wifiEncryption.equals("WPA2", true) || payload.wifiEncryption.equals("WPA3", true))) ||
+                                (typeKey == "nopass" && payload.wifiEncryption.equals("Open", true))
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSel) ElectricCyan else CardDark,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, if (isSel) ElectricCyan else CardBorder),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    onPayloadChange(payload.copy(wifiEncryption = typeKey))
+                                }
+                        ) {
+                            Box(
+                                modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = when (typeKey) {
+                                        "WPA" -> "WPA/WPA2"
+                                        "WEP" -> "WEP (Old)"
+                                        "WPS" -> "WPS"
+                                        else -> "Open"
+                                    },
+                                    color = if (isSel) Color.Black else TextPrimary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(10.dp))
+
+                // Password / Key Field (Required for WPA, WEP, and WPS PIN)
+                if (payload.wifiEncryption != "nopass" && payload.wifiEncryption != "Open") {
+                    OutlinedTextField(
+                        value = if (payload.wifiEncryption == "WPS" && payload.wifiWpsMethod == "PIN") payload.wifiWpsPin else payload.wifiPassword,
+                        onValueChange = { input ->
+                            if (payload.wifiEncryption == "WPS" && payload.wifiWpsMethod == "PIN") {
+                                onPayloadChange(payload.copy(wifiWpsPin = input))
+                            } else {
+                                onPayloadChange(payload.copy(wifiPassword = input))
+                            }
+                        },
+                        label = {
+                            Text(
+                                text = when (payload.wifiEncryption) {
+                                    "WEP" -> "WEP Key (64/128-bit WEP)"
+                                    "WPS" -> if (payload.wifiWpsMethod == "PIN") "WPS 8-Digit PIN" else "WPS Password / Key"
+                                    else -> "WPA/WPA2 Password"
+                                },
+                                color = TextSecondary,
+                                fontSize = 13.sp
+                            )
+                        },
+                        singleLine = true,
+                        visualTransformation = if (showWifiPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { showWifiPassword = !showWifiPassword }) {
+                                Icon(
+                                    imageVector = if (showWifiPassword) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = "Toggle password",
+                                    tint = TextMuted
+                                )
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("wifi_password_input"),
+                        colors = customTextFieldColors()
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                // WPS Specific Sub-method selector
+                if (payload.wifiEncryption == "WPS") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("WPS Method", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf("PIN" to "PIN Code", "PBC" to "Push Button").forEach { (methodKey, labelStr) ->
+                                val isSelected = payload.wifiWpsMethod == methodKey
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (isSelected) NeonViolet else SurfaceDark,
+                                    modifier = Modifier.clickable { onPayloadChange(payload.copy(wifiWpsMethod = methodKey)) }
+                                ) {
+                                    Text(
+                                        text = labelStr,
+                                        color = if (isSelected) Color.White else TextSecondary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Hidden Network", color = TextPrimary, fontSize = 14.sp)
+                    Column {
+                        Text("Hidden Network", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Network does not broadcast SSID", color = TextMuted, fontSize = 11.sp)
+                    }
                     Switch(
                         checked = payload.wifiHidden,
                         onCheckedChange = { onPayloadChange(payload.copy(wifiHidden = it)) },

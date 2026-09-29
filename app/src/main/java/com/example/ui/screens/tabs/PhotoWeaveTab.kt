@@ -72,6 +72,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.qr.engine.BuiltInLogos
 import com.example.qr.engine.ImageMode
 import com.example.qr.engine.PhotoKernel
 import com.example.qr.engine.QrStyle
@@ -347,7 +348,7 @@ fun PhotoWeaveTab(
             }
         }
 
-        // 3. Center Logo (Custom PNG Logo Upload)
+        // 3. Center Logo (Custom PNG Logo Upload or Pre-added Logos)
         Column {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -355,7 +356,7 @@ fun PhotoWeaveTab(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Center Logo (PNG)", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                if (logoBitmap != null) {
+                if (logoBitmap != null || style.selectedLogoId != null) {
                     Text(
                         text = "Remove logo ✕",
                         color = BeaconRose,
@@ -379,7 +380,7 @@ fun PhotoWeaveTab(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // Option 1: None Tile
-                val isNoneSelected = logoBitmap == null
+                val isNoneSelected = logoBitmap == null && style.selectedLogoId == null
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -412,12 +413,12 @@ fun PhotoWeaveTab(
                 }
 
                 // Option 2: Upload Custom Logo Tile
-                val isCustomSelected = logoBitmap != null
+                val isCustomUpload = logoBitmap != null && style.selectedLogoId == null
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(if (isCustomSelected) ElectricCyan.copy(alpha = 0.12f) else CardDark)
+                        .background(if (isCustomUpload) ElectricCyan.copy(alpha = 0.12f) else CardDark)
                         .clickable {
                             logoPickerLauncher.launch(
                                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
@@ -430,7 +431,7 @@ fun PhotoWeaveTab(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        if (logoBitmap != null) {
+                        if (isCustomUpload) {
                             Image(
                                 bitmap = logoBitmap.asImageBitmap(),
                                 contentDescription = "Custom Logo",
@@ -445,17 +446,66 @@ fun PhotoWeaveTab(
                             )
                         }
                         Text(
-                            text = if (isCustomSelected) "Custom Added" else "+ Upload Logo",
-                            color = if (isCustomSelected) ElectricCyan else TextPrimary,
+                            text = if (isCustomUpload) "Custom Added" else "+ Upload Logo",
+                            color = if (isCustomUpload) ElectricCyan else TextPrimary,
                             fontSize = 12.sp,
-                            fontWeight = if (isCustomSelected) FontWeight.Bold else FontWeight.Medium
+                            fontWeight = if (isCustomUpload) FontWeight.Bold else FontWeight.Medium
                         )
                     }
                 }
             }
 
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Pre-added Logos Section (81 App Logos)
+            Text("Pre-Added App Logos (81)", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                BuiltInLogos.list.forEach { logo ->
+                    val isSelected = style.selectedLogoId == logo.id
+                    val logoBmp = remember(logo.id) { BuiltInLogos.loadLogoBitmap(context, logo.id) }
+                    val bg = if (isSelected) ElectricCyan.copy(alpha = 0.2f) else CardDark
+                    val border = if (isSelected) ElectricCyan else CardBorder
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(bg)
+                            .border(1.dp, border, RoundedCornerShape(10.dp))
+                            .clickable { onBuiltInLogoSelected(logo.id) }
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            if (logoBmp != null) {
+                                Image(
+                                    bitmap = logoBmp.asImageBitmap(),
+                                    contentDescription = logo.name,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Text(
+                                text = logo.name,
+                                color = if (isSelected) ElectricCyan else TextPrimary,
+                                fontSize = 11.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+            }
+
             // Logo scale slider if logo is active
-            if (logoBitmap != null) {
+            if (logoBitmap != null || style.selectedLogoId != null) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),

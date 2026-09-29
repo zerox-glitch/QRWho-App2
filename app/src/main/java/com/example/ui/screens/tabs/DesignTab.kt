@@ -446,23 +446,20 @@ fun DesignTab(
             )
         }
 
-        // 9. Scan Me Badges & Border Captions
+        // 9. Sleek 'Scan Me' Badges
         Column {
-            Text("Scan Me Badges & Border Frames", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            Text("Sleek badges attached near the border without shrinking the QR code", color = TextMuted, fontSize = 11.sp)
+            Text("Sleek 'Scan Me' Badges", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text("Simple, sleek badges positioned cleanly at the edge without covering your QR code or adding heavy borders.", color = TextMuted, fontSize = 11.sp)
 
             Spacer(modifier = Modifier.height(10.dp))
 
             val badgeStyles = listOf(
                 Pair(FrameStyle.None, "No Badge"),
-                Pair(FrameStyle.BadgeScanMe, "Scan Me Badge"),
-                Pair(FrameStyle.ModernPill, "Modern Pill"),
-                Pair(FrameStyle.NeonGlow, "Neon Edge Badge"),
-                Pair(FrameStyle.Badge, "Ribbon Badge"),
-                Pair(FrameStyle.Label, "Header Label"),
-                Pair(FrameStyle.Speech, "Speech Bubble"),
-                Pair(FrameStyle.SimpleBorder, "Thin Keyline Border"),
-                Pair(FrameStyle.Card, "Compact Card")
+                Pair(FrameStyle.BadgeScanMe, "Bottom Capsule"),
+                Pair(FrameStyle.ModernPill, "Top Capsule"),
+                Pair(FrameStyle.Badge, "Angled Ribbon"),
+                Pair(FrameStyle.Label, "Minimal Tag"),
+                Pair(FrameStyle.Speech, "Speech Bubble")
             )
 
             Row(

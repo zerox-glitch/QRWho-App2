@@ -359,9 +359,10 @@ fun PresetsTab(
             val isCustom = preset.id.startsWith("custom_")
             val customId = if (isCustom) preset.id.removePrefix("custom_").toLongOrNull() else null
 
+            val context = androidx.compose.ui.platform.LocalContext.current
             // Generate/retrieve real miniature QR bitmap with caching
             val qrThumbnail = remember(preset.id, preset.style) {
-                QrGenerator.getOrGenerateThumbnail(preset.style, sizePx = 120)
+                QrGenerator.getOrGenerateThumbnail(preset.style, sizePx = 120, context = context)
             }
 
             Surface(

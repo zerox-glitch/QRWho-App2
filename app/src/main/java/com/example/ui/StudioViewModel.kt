@@ -32,6 +32,14 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
 
+data class DesignStateSnapshot(
+    val style: QrStyle,
+    val payload: QrPayload,
+    val photoBitmap: Bitmap?,
+    val samplePhotoId: String?,
+    val customLogo: Bitmap?
+)
+
 class StudioViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = QrRepository(AppDatabase.getDatabase(application).qrDao())
@@ -100,13 +108,246 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     private val _kofiCountdown = MutableStateFlow(15)
     val kofiCountdown: StateFlow<Int> = _kofiCountdown.asStateFlow()
 
+    // Undo / Redo State Management
+    private val undoStack = mutableListOf<DesignStateSnapshot>()
+    private val redoStack = mutableListOf<DesignStateSnapshot>()
+
+    private val _canUndo = MutableStateFlow(false)
+    val canUndo: StateFlow<Boolean> = _canUndo.asStateFlow()
+
+    private val _canRedo = MutableStateFlow(false)
+    val canRedo: StateFlow<Boolean> = _canRedo.asStateFlow()
+
     private var renderJob: Job? = null
     private var kofiTimerJob: Job? = null
+    private var samplePhotoId: String? = null
+
+    private fun currentSnapshot(): DesignStateSnapshot {
+        return DesignStateSnapshot(
+            style = _style.value,
+            payload = _payload.value,
+            photoBitmap = _photoBitmap.value,
+            samplePhotoId = samplePhotoId,
+            customLogo = _customLogo.value
+        )
+    }
+
+    private fun updateCanUndoRedo() {
+        _canUndo.value = undoStack.isNotEmpty()
+        _canRedo.value = redoStack.isNotEmpty()
+    }
+
+    fun recordUndoState() {
+        val snap = currentSnapshot()
+        if (undoStack.isEmpty() || undoStack.last() != snap) {
+            undoStack.add(snap)
+            if (undoStack.size > 35) {
+                undoStack.removeAt(0)
+            }
+            redoStack.clear()
+            updateCanUndoRedo()
+        }
+    }
+
+    fun undo() {
+        if (undoStack.isEmpty()) return
+        val previousState = undoStack.removeAt(undoStack.lastIndex)
+        redoStack.add(currentSnapshot())
+
+        _style.value = previousState.style
+        _payload.value = previousState.payload
+        _photoBitmap.value = previousState.photoBitmap
+        samplePhotoId = previousState.samplePhotoId
+        _customLogo.value = previousState.customLogo
+
+        updateCanUndoRedo()
+        _userMessage.value = "↩ Undid design change"
+        triggerRender()
+        saveDraftState()
+    }
+
+    fun redo() {
+        if (redoStack.isEmpty()) return
+        val nextState = redoStack.removeAt(redoStack.lastIndex)
+        undoStack.add(currentSnapshot())
+
+        _style.value = nextState.style
+        _payload.value = nextState.payload
+        _photoBitmap.value = nextState.photoBitmap
+        samplePhotoId = nextState.samplePhotoId
+        _customLogo.value = nextState.customLogo
+
+        updateCanUndoRedo()
+        _userMessage.value = "↪ Redid design change"
+        triggerRender()
+        saveDraftState()
+    }
+
+    private fun prefs() = getApplication<Application>().getSharedPreferences("qrwho_draft_studio_v1", Context.MODE_PRIVATE)
 
     init {
+        com.example.qr.engine.SamplePhotos.appContext = application.applicationContext
         // Initialize presets from assets (all 335 items)
         QrPresets.initialize(application)
-        triggerRender()
+        if (!restoreDraftState()) {
+            loadDefaultDesign()
+        } else {
+            triggerRender()
+        }
+    }
+
+    private fun loadDefaultDesign() {
+        val solarpunkPreset = QrPresets.findById("art-solarpunk")
+        val defaultStyle = solarpunkPreset?.style?.copy(imageMode = ImageMode.Clean)
+            ?: QrPresets.fallbackList.first().style.copy(imageMode = ImageMode.Clean)
+        _style.value = defaultStyle
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val fernBitmap = SamplePhotos.loadSampleBitmap(getApplication(), "art-emerald-fern", 1024)
+            withContext(Dispatchers.Main) {
+                _photoBitmap.value = fernBitmap
+                samplePhotoId = "art-emerald-fern"
+                triggerRender()
+                saveDraftState()
+            }
+        }
+    }
+
+    private fun saveDraftState() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val p = prefs().edit()
+                p.putBoolean("has_draft", true)
+
+                // Save Payload
+                val payload = _payload.value
+                p.putString("p_kind", payload.kind.name)
+                p.putString("p_url", payload.url)
+                p.putString("p_wifi_ssid", payload.wifiSsid)
+                p.putString("p_wifi_pass", payload.wifiPassword)
+                p.putString("p_text", payload.text)
+
+                // Save Style
+                val s = _style.value
+                p.putString("s_module_shape", s.moduleShape.name)
+                p.putString("s_eye_shape", s.eyeShape.name)
+                p.putString("s_ball_shape", s.ballShape.name)
+                p.putInt("s_fg_color", s.fgColor)
+                p.putInt("s_bg_color", s.bgColor)
+                p.putInt("s_eye_color", s.eyeColor)
+                p.putInt("s_ball_color", s.ballColor)
+                p.putString("s_gradient_type", s.gradientType.name)
+                p.putInt("s_gradient_to", s.gradientTo)
+                p.putString("s_frame_style", s.frameStyle.name)
+                p.putString("s_frame_caption", s.frameCaption)
+                p.putInt("s_quiet_zone", s.quietZone)
+                p.putString("s_image_mode", s.imageMode.name)
+                p.putFloat("s_image_opacity", s.imageOpacity)
+                p.putFloat("s_contrast", s.contrast)
+                p.putInt("s_min_version", s.minVersion)
+                p.putFloat("s_dot_scale", s.dotScale)
+                p.putFloat("s_module_gap", s.moduleGap)
+
+                // Save Photo reference
+                p.putString("s_sample_photo_id", samplePhotoId ?: "")
+
+                val currentPhoto = _photoBitmap.value
+                if (samplePhotoId == null && currentPhoto != null) {
+                    p.putBoolean("s_has_custom_photo", true)
+                    val photoFile = File(getApplication<Application>().filesDir, "draft_photo.png")
+                    FileOutputStream(photoFile).use { out ->
+                        currentPhoto.compress(Bitmap.CompressFormat.PNG, 90, out)
+                    }
+                } else if (samplePhotoId == null && currentPhoto == null) {
+                    p.putBoolean("s_has_custom_photo", false)
+                    val photoFile = File(getApplication<Application>().filesDir, "draft_photo.png")
+                    if (photoFile.exists()) photoFile.delete()
+                }
+
+                p.apply()
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun restoreDraftState(): Boolean {
+        val p = prefs()
+        if (!p.getBoolean("has_draft", false)) return false
+
+        try {
+            // Restore Payload
+            val kindStr = p.getString("p_kind", PayloadKind.URL.name) ?: PayloadKind.URL.name
+            val kind = try { PayloadKind.valueOf(kindStr) } catch (_: Exception) { PayloadKind.URL }
+            _payload.value = QrPayload(
+                kind = kind,
+                url = p.getString("p_url", "https://qrwho.vercel.app") ?: "https://qrwho.vercel.app",
+                wifiSsid = p.getString("p_wifi_ssid", "") ?: "",
+                wifiPassword = p.getString("p_wifi_pass", "") ?: "",
+                text = p.getString("p_text", "") ?: ""
+            )
+
+            // Restore Style
+            val moduleShape = try { ModuleShape.valueOf(p.getString("s_module_shape", "Fluid") ?: "Fluid") } catch (_: Exception) { ModuleShape.Fluid }
+            val eyeShape = try { EyeShape.valueOf(p.getString("s_eye_shape", "Leaf") ?: "Leaf") } catch (_: Exception) { EyeShape.Leaf }
+            val ballShape = try { EyeShape.valueOf(p.getString("s_ball_shape", "Rounded") ?: "Rounded") } catch (_: Exception) { EyeShape.Rounded }
+            val gradientType = try { GradientType.valueOf(p.getString("s_gradient_type", "Diagonal") ?: "Diagonal") } catch (_: Exception) { GradientType.Diagonal }
+            val frameStyle = try { FrameStyle.valueOf(p.getString("s_frame_style", "None") ?: "None") } catch (_: Exception) { FrameStyle.None }
+            val imageMode = try { ImageMode.valueOf(p.getString("s_image_mode", "Clean") ?: "Clean") } catch (_: Exception) { ImageMode.Clean }
+
+            _style.value = QrStyle(
+                moduleShape = moduleShape,
+                eyeShape = eyeShape,
+                ballShape = ballShape,
+                fgColor = p.getInt("s_fg_color", 0xFF84CC16.toInt()),
+                bgColor = p.getInt("s_bg_color", 0xFF0C1708.toInt()),
+                eyeColor = p.getInt("s_eye_color", 0xFFFACC15.toInt()),
+                ballColor = p.getInt("s_ball_color", 0xFF65A30D.toInt()),
+                gradientType = gradientType,
+                gradientTo = p.getInt("s_gradient_to", 0xFFEAB308.toInt()),
+                frameStyle = frameStyle,
+                frameCaption = p.getString("s_frame_caption", "SCAN ME") ?: "SCAN ME",
+                quietZone = p.getInt("s_quiet_zone", 2),
+                imageMode = imageMode,
+                imageOpacity = p.getFloat("s_image_opacity", 0.86f),
+                contrast = p.getFloat("s_contrast", 1.0f),
+                minVersion = p.getInt("s_min_version", 2),
+                dotScale = p.getFloat("s_dot_scale", 0.88f),
+                moduleGap = p.getFloat("s_module_gap", 0.02f)
+            )
+
+            // Restore Photo
+            val sampleId = p.getString("s_sample_photo_id", "") ?: ""
+            val hasCustom = p.getBoolean("s_has_custom_photo", false)
+
+            if (sampleId.isNotEmpty()) {
+                samplePhotoId = sampleId
+                viewModelScope.launch(Dispatchers.IO) {
+                    val bmp = SamplePhotos.loadSampleBitmap(getApplication(), sampleId, 1024)
+                    withContext(Dispatchers.Main) {
+                        _photoBitmap.value = bmp
+                        triggerRender()
+                    }
+                }
+            } else if (hasCustom) {
+                samplePhotoId = null
+                viewModelScope.launch(Dispatchers.IO) {
+                    val photoFile = File(getApplication<Application>().filesDir, "draft_photo.png")
+                    if (photoFile.exists()) {
+                        val bmp = android.graphics.BitmapFactory.decodeFile(photoFile.absolutePath)
+                        withContext(Dispatchers.Main) {
+                            _photoBitmap.value = bmp
+                            triggerRender()
+                        }
+                    }
+                }
+            } else {
+                samplePhotoId = null
+                _photoBitmap.value = null
+            }
+
+            return true
+        } catch (_: Exception) {
+            return false
+        }
     }
 
     fun triggerKofiSupportModal() {
@@ -163,16 +404,21 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun updatePayload(newPayload: QrPayload) {
+        recordUndoState()
         _payload.value = newPayload
         triggerRender()
+        saveDraftState()
     }
 
     fun updateStyle(newStyle: QrStyle) {
+        recordUndoState()
         _style.value = newStyle
         triggerRender()
+        saveDraftState()
     }
 
     fun selectPreset(preset: QrPreset) {
+        recordUndoState()
         _userMessage.value = "Applied ${preset.name} style"
         val artId = preset.style.artDirection
         if (artId != null && ArtFrameRenderer.isArtFrame(artId)) {
@@ -180,20 +426,57 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                 val bmp = SamplePhotos.loadSampleBitmap(getApplication(), artId, 1024)
                 withContext(Dispatchers.Main) {
                     _photoBitmap.value = bmp
+                    samplePhotoId = artId
                     _style.value = preset.style.copy(imageMode = ImageMode.Clean)
                     triggerRender()
+                    saveDraftState()
                 }
             }
         } else {
-            _style.value = preset.style
+            val currentPhoto = _photoBitmap.value
+            val currentMode = _style.value.imageMode
+            val hasPhoto = currentPhoto != null
+            val isPhotoMode = currentMode != ImageMode.None && currentMode != ImageMode.Logo
+
+            if (hasPhoto) {
+                // Keep selected photo active with the new preset style
+                val targetMode = if (preset.style.imageMode != ImageMode.None) {
+                    preset.style.imageMode
+                } else if (isPhotoMode) {
+                    currentMode
+                } else {
+                    ImageMode.Clean
+                }
+                _style.value = preset.style.copy(imageMode = targetMode)
+            } else {
+                _style.value = preset.style
+            }
             triggerRender()
+            saveDraftState()
         }
     }
 
     fun applyShowcase(item: ShowcaseItem) {
+        recordUndoState()
         val foundPreset = QrPresets.findById(item.presetId)
         if (foundPreset != null) {
-            _style.value = foundPreset.style
+            val currentPhoto = _photoBitmap.value
+            val currentMode = _style.value.imageMode
+            val hasPhoto = currentPhoto != null
+            val isPhotoMode = currentMode != ImageMode.None && currentMode != ImageMode.Logo
+
+            if (hasPhoto) {
+                val targetMode = if (foundPreset.style.imageMode != ImageMode.None) {
+                    foundPreset.style.imageMode
+                } else if (isPhotoMode) {
+                    currentMode
+                } else {
+                    ImageMode.Clean
+                }
+                _style.value = foundPreset.style.copy(imageMode = targetMode)
+            } else {
+                _style.value = foundPreset.style
+            }
         }
         _payload.value = _payload.value.copy(
             kind = PayloadKind.URL,
@@ -201,27 +484,39 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         )
         _userMessage.value = "Loaded ${item.title} into Studio"
         triggerRender()
+        saveDraftState()
     }
 
     fun setPhoto(bitmap: Bitmap?) {
+        recordUndoState()
         _photoBitmap.value = bitmap
+        if (bitmap == null) {
+            samplePhotoId = null
+        }
         if (bitmap != null) {
             _style.value = _style.value.copy(imageMode = ImageMode.Clean)
         }
         triggerRender()
+        saveDraftState()
     }
 
     fun selectSamplePhoto(sampleId: String) {
+        recordUndoState()
         viewModelScope.launch(Dispatchers.IO) {
-            val bmp = SamplePhotos.loadSampleBitmap(getApplication(), sampleId)
+            val bmp = SamplePhotos.loadSampleBitmap(getApplication(), sampleId, 1024)
             withContext(Dispatchers.Main) {
-                setPhoto(bmp)
+                samplePhotoId = sampleId
+                _photoBitmap.value = bmp
+                _style.value = _style.value.copy(imageMode = ImageMode.Clean)
                 _userMessage.value = "Sample photo loaded"
+                triggerRender()
+                saveDraftState()
             }
         }
     }
 
     fun setCustomLogo(bitmap: Bitmap?) {
+        recordUndoState()
         _customLogo.value = bitmap
         if (bitmap != null) {
             _style.value = _style.value.copy(
@@ -320,12 +615,25 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun selectBuiltInLogo(logoId: String?) {
-        _customLogo.value = null
-        _style.value = _style.value.copy(selectedLogoId = logoId)
+        recordUndoState()
+        if (logoId != null) {
+            val app = getApplication<android.app.Application>()
+            val bmp = com.example.qr.engine.BuiltInLogos.loadLogoBitmap(app, logoId)
+            _customLogo.value = bmp
+            _style.value = _style.value.copy(
+                selectedLogoId = logoId,
+                ecc = "H",
+                logoScale = _style.value.logoScale.coerceIn(0.20f, 0.26f)
+            )
+        } else {
+            _customLogo.value = null
+            _style.value = _style.value.copy(selectedLogoId = null)
+        }
         triggerRender()
     }
 
     fun autoFixScan() {
+        recordUndoState()
         viewModelScope.launch(Dispatchers.Default) {
             _isOptimizing.value = true
             try {

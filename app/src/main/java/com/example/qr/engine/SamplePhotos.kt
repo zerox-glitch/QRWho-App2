@@ -21,75 +21,75 @@ data class SamplePhotoItem(
 object SamplePhotos {
     val list = listOf(
         // 30 Imported GitHub Frame Templates
-        SamplePhotoItem("art-aurora-night", "Aurora Night", "Bioluminescent aurora night sky", "samples/aurora-night.png", "Art Frames"),
-        SamplePhotoItem("art-aztec-sun", "Aztec Sun", "Ancient Aztec gold sun emblem", "samples/aztec-sun.png", "Art Frames"),
-        SamplePhotoItem("art-coral-bloom", "Coral Bloom", "Vibrant coral floral burst", "samples/coral-bloom.png", "Art Frames"),
-        SamplePhotoItem("art-coral-reef", "Coral Reef", "Deep sea aquatic coral reef", "samples/coral-reef.png", "Art Frames"),
-        SamplePhotoItem("art-cosmic-nebula", "Cosmic Nebula", "Deep space stellar vortex", "samples/cosmic-nebula.png", "Art Frames"),
-        SamplePhotoItem("art-crystal-ice", "Crystal Ice", "Frozen crystalline prism geometry", "samples/crystal-ice.png", "Art Frames"),
-        SamplePhotoItem("art-deco-gold", "Deco Gold", "Art Deco gold filigree pattern", "samples/deco-gold.png", "Art Frames"),
-        SamplePhotoItem("art-ember-roses", "Ember Roses", "Glowing fiery rose petals", "samples/ember-roses.png", "Art Frames"),
-        SamplePhotoItem("art-emerald-fern", "Emerald Fern", "Lush tropical rainforest fern", "samples/emerald-fern.png", "Art Frames"),
-        SamplePhotoItem("art-enchanted-forest", "Enchanted Forest", "Mystical moonlit woodland", "samples/enchanted-forest.png", "Art Frames"),
-        SamplePhotoItem("art-festival-lights", "Festival Lights", "Festive glowing lantern bokeh", "samples/festival-lights.png", "Art Frames"),
-        SamplePhotoItem("art-frost-blue", "Frost Blue", "Icy blue glacial crystal overlay", "samples/frost-blue.png", "Art Frames"),
-        SamplePhotoItem("art-golden-lotus", "Golden Lotus", "Sacred golden lotus motif", "samples/golden-lotus.png", "Art Frames"),
-        SamplePhotoItem("art-golden-roses", "Golden Roses", "Luxurious metallic gold roses", "samples/golden-roses.png", "Art Frames"),
-        SamplePhotoItem("art-great-wave", "Great Wave", "Classic ukiyo-e ocean tsunami", "samples/great-wave.png", "Art Frames"),
-        SamplePhotoItem("art-groovy-70s", "Groovy 70s", "Retro 1970s psychedelic waves", "samples/groovy-70s.png", "Art Frames"),
-        SamplePhotoItem("art-holo-chrome", "Holo Chrome", "Holographic liquid mercury reflection", "samples/holo-chrome.png", "Art Frames"),
-        SamplePhotoItem("art-kawaii-sweets", "Kawaii Sweets", "Playful pastel candy pattern", "samples/kawaii-sweets.png", "Art Frames"),
-        SamplePhotoItem("art-marble-gold", "Marble Gold", "Carrara marble with gold veins", "samples/marble-gold.png", "Art Frames"),
-        SamplePhotoItem("art-mosaic-lapis", "Mosaic Lapis", "Royal lapis lazuli mosaic tiles", "samples/mosaic-lapis.png", "Art Frames"),
-        SamplePhotoItem("art-neon-grid", "Neon Grid", "Cyberpunk neon retrowave grid", "samples/neon-grid.png", "Art Frames"),
-        SamplePhotoItem("art-phoenix-fire", "Phoenix Fire", "Majestic fiery phoenix wings", "samples/phoenix-fire.png", "Art Frames"),
-        SamplePhotoItem("art-pixel-voxel", "Pixel Voxel", "3D isometric pixel block matrix", "samples/pixel-voxel.png", "Art Frames"),
-        SamplePhotoItem("art-sakura-night", "Sakura Night", "Cherry blossom petals under starlight", "samples/sakura-night.png", "Art Frames"),
-        SamplePhotoItem("art-silver-frost", "Silver Frost", "Metallic silver frost ornament", "samples/silver-frost.png", "Art Frames"),
-        SamplePhotoItem("art-stained-glass", "Stained Glass", "Gothic cathedral stained glass window", "samples/stained-glass.png", "Art Frames"),
-        SamplePhotoItem("art-steampunk", "Steampunk", "Victorian brass cogs & gears", "samples/steampunk.png", "Art Frames"),
-        SamplePhotoItem("art-vintage-glam", "Vintage Glam", "Glamorous vintage golden flourish", "samples/vintage-glam.png", "Art Frames"),
-        SamplePhotoItem("art-violet-stars", "Violet Stars", "Deep violet cosmic stardust", "samples/violet-stars.png", "Art Frames"),
-        SamplePhotoItem("art-wisteria-glow", "Wisteria Glow", "Cascading glowing wisteria vines", "samples/wisteria-glow.png", "Art Frames"),
+        SamplePhotoItem("art-aurora-night", "Aurora Night", "Bioluminescent aurora night sky", "samples/aurora-night.webp", "Art Frames"),
+        SamplePhotoItem("art-aztec-sun", "Aztec Sun", "Ancient Aztec gold sun emblem", "samples/aztec-sun.webp", "Art Frames"),
+        SamplePhotoItem("art-coral-bloom", "Coral Bloom", "Vibrant coral floral burst", "samples/coral-bloom.webp", "Art Frames"),
+        SamplePhotoItem("art-coral-reef", "Coral Reef", "Deep sea aquatic coral reef", "samples/coral-reef.webp", "Art Frames"),
+        SamplePhotoItem("art-cosmic-nebula", "Cosmic Nebula", "Deep space stellar vortex", "samples/cosmic-nebula.webp", "Art Frames"),
+        SamplePhotoItem("art-crystal-ice", "Crystal Ice", "Frozen crystalline prism geometry", "samples/crystal-ice.webp", "Art Frames"),
+        SamplePhotoItem("art-deco-gold", "Deco Gold", "Art Deco gold filigree pattern", "samples/deco-gold.webp", "Art Frames"),
+        SamplePhotoItem("art-ember-roses", "Ember Roses", "Glowing fiery rose petals", "samples/ember-roses.webp", "Art Frames"),
+        SamplePhotoItem("art-emerald-fern", "Emerald Fern", "Lush tropical rainforest fern", "samples/emerald-fern.webp", "Art Frames"),
+        SamplePhotoItem("art-enchanted-forest", "Enchanted Forest", "Mystical moonlit woodland", "samples/enchanted-forest.webp", "Art Frames"),
+        SamplePhotoItem("art-festival-lights", "Festival Lights", "Festive glowing lantern bokeh", "samples/festival-lights.webp", "Art Frames"),
+        SamplePhotoItem("art-frost-blue", "Frost Blue", "Icy blue glacial crystal overlay", "samples/frost-blue.webp", "Art Frames"),
+        SamplePhotoItem("art-golden-lotus", "Golden Lotus", "Sacred golden lotus motif", "samples/golden-lotus.webp", "Art Frames"),
+        SamplePhotoItem("art-golden-roses", "Golden Roses", "Luxurious metallic gold roses", "samples/golden-roses.webp", "Art Frames"),
+        SamplePhotoItem("art-great-wave", "Great Wave", "Classic ukiyo-e ocean tsunami", "samples/great-wave.webp", "Art Frames"),
+        SamplePhotoItem("art-groovy-70s", "Groovy 70s", "Retro 1970s psychedelic waves", "samples/groovy-70s.webp", "Art Frames"),
+        SamplePhotoItem("art-holo-chrome", "Holo Chrome", "Holographic liquid mercury reflection", "samples/holo-chrome.webp", "Art Frames"),
+        SamplePhotoItem("art-kawaii-sweets", "Kawaii Sweets", "Playful pastel candy pattern", "samples/kawaii-sweets.webp", "Art Frames"),
+        SamplePhotoItem("art-marble-gold", "Marble Gold", "Carrara marble with gold veins", "samples/marble-gold.webp", "Art Frames"),
+        SamplePhotoItem("art-mosaic-lapis", "Mosaic Lapis", "Royal lapis lazuli mosaic tiles", "samples/mosaic-lapis.webp", "Art Frames"),
+        SamplePhotoItem("art-neon-grid", "Neon Grid", "Cyberpunk neon retrowave grid", "samples/neon-grid.webp", "Art Frames"),
+        SamplePhotoItem("art-phoenix-fire", "Phoenix Fire", "Majestic fiery phoenix wings", "samples/phoenix-fire.webp", "Art Frames"),
+        SamplePhotoItem("art-pixel-voxel", "Pixel Voxel", "3D isometric pixel block matrix", "samples/pixel-voxel.webp", "Art Frames"),
+        SamplePhotoItem("art-sakura-night", "Sakura Night", "Cherry blossom petals under starlight", "samples/sakura-night.webp", "Art Frames"),
+        SamplePhotoItem("art-silver-frost", "Silver Frost", "Metallic silver frost ornament", "samples/silver-frost.webp", "Art Frames"),
+        SamplePhotoItem("art-stained-glass", "Stained Glass", "Gothic cathedral stained glass window", "samples/stained-glass.webp", "Art Frames"),
+        SamplePhotoItem("art-steampunk", "Steampunk", "Victorian brass cogs & gears", "samples/steampunk.webp", "Art Frames"),
+        SamplePhotoItem("art-vintage-glam", "Vintage Glam", "Glamorous vintage golden flourish", "samples/vintage-glam.webp", "Art Frames"),
+        SamplePhotoItem("art-violet-stars", "Violet Stars", "Deep violet cosmic stardust", "samples/violet-stars.webp", "Art Frames"),
+        SamplePhotoItem("art-wisteria-glow", "Wisteria Glow", "Cascading glowing wisteria vines", "samples/wisteria-glow.webp", "Art Frames"),
 
         // 20 Imported GitHub Frame Templates 2
-        SamplePhotoItem("art-arabian-nights", "Arabian Nights", "Exotic star-lit desert nights", "samples/arabian-nights.png", "Art Frames"),
-        SamplePhotoItem("art-autumn-harvest", "Autumn Harvest", "Golden autumn foliage and harvest theme", "samples/autumn-harvest.png", "Art Frames"),
-        SamplePhotoItem("art-balloon-party", "Balloon Party", "Festive colorful celebration balloons", "samples/balloon-party.png", "Art Frames"),
-        SamplePhotoItem("art-christmas-frost", "Christmas Frost", "Winter holiday snow and frosted ornament", "samples/christmas-frost.png", "Art Frames"),
-        SamplePhotoItem("art-cocoa-cafe", "Cocoa Cafe", "Cozy warm coffee shop aesthetic", "samples/cocoa-cafe.png", "Art Frames"),
-        SamplePhotoItem("art-dino-world", "Dino World", "Prehistoric Jurassic jungle theme", "samples/dino-world.png", "Art Frames"),
-        SamplePhotoItem("art-fireworks-night", "Fireworks Night", "Sparkling night sky fireworks display", "samples/fireworks-night.png", "Art Frames"),
-        SamplePhotoItem("art-halloween-night", "Halloween Night", "Spooky Halloween pumpkin and moonlight", "samples/halloween-night.png", "Art Frames"),
-        SamplePhotoItem("art-moonlit-zodiac", "Moonlit Zodiac", "Celestial zodiac astrology constellation", "samples/moonlit-zodiac.png", "Art Frames"),
-        SamplePhotoItem("art-music-groove", "Music Groove", "Rhythmic musical notes and soundwaves", "samples/music-groove.png", "Art Frames"),
-        SamplePhotoItem("art-nautical-bay", "Nautical Bay", "Maritime anchor and sea harbor breeze", "samples/nautical-bay.png", "Art Frames"),
-        SamplePhotoItem("art-pastel-dream", "Pastel Dream", "Soft pastel cloudscape dreamland", "samples/pastel-dream.png", "Art Frames"),
-        SamplePhotoItem("art-rainy-april", "Rainy April", "Fresh spring raindrops and umbrellas", "samples/rainy-april.png", "Art Frames"),
-        SamplePhotoItem("art-royal-baroque", "Royal Baroque", "Opulent royal baroque gold motif", "samples/royal-baroque.png", "Art Frames"),
-        SamplePhotoItem("art-safari-savanna", "Safari Savanna", "African savanna sunset and wildlife", "samples/safari-savanna.png", "Art Frames"),
-        SamplePhotoItem("art-sumi-ink", "Sumi Ink", "Traditional East Asian brush ink art", "samples/sumi-ink.png", "Art Frames"),
-        SamplePhotoItem("art-travel-wonders", "Travel Wonders", "Global landmarks and travel adventure", "samples/travel-wonders.png", "Art Frames"),
-        SamplePhotoItem("art-tropical-paradise", "Tropical Paradise", "Exotic palm beach and island vibes", "samples/tropical-paradise.png", "Art Frames"),
-        SamplePhotoItem("art-wedding-rose", "Wedding Rose", "Elegant romantic wedding rose arch", "samples/wedding-rose.png", "Art Frames"),
-        SamplePhotoItem("art-zen-mandala", "Zen Mandala", "Serene spiritual mandala pattern", "samples/zen-mandala.png", "Art Frames"),
+        SamplePhotoItem("art-arabian-nights", "Arabian Nights", "Exotic star-lit desert nights", "samples/arabian-nights.webp", "Art Frames"),
+        SamplePhotoItem("art-autumn-harvest", "Autumn Harvest", "Golden autumn foliage and harvest theme", "samples/autumn-harvest.webp", "Art Frames"),
+        SamplePhotoItem("art-balloon-party", "Balloon Party", "Festive colorful celebration balloons", "samples/balloon-party.webp", "Art Frames"),
+        SamplePhotoItem("art-christmas-frost", "Christmas Frost", "Winter holiday snow and frosted ornament", "samples/christmas-frost.webp", "Art Frames"),
+        SamplePhotoItem("art-cocoa-cafe", "Cocoa Cafe", "Cozy warm coffee shop aesthetic", "samples/cocoa-cafe.webp", "Art Frames"),
+        SamplePhotoItem("art-dino-world", "Dino World", "Prehistoric Jurassic jungle theme", "samples/dino-world.webp", "Art Frames"),
+        SamplePhotoItem("art-fireworks-night", "Fireworks Night", "Sparkling night sky fireworks display", "samples/fireworks-night.webp", "Art Frames"),
+        SamplePhotoItem("art-halloween-night", "Halloween Night", "Spooky Halloween pumpkin and moonlight", "samples/halloween-night.webp", "Art Frames"),
+        SamplePhotoItem("art-moonlit-zodiac", "Moonlit Zodiac", "Celestial zodiac astrology constellation", "samples/moonlit-zodiac.webp", "Art Frames"),
+        SamplePhotoItem("art-music-groove", "Music Groove", "Rhythmic musical notes and soundwaves", "samples/music-groove.webp", "Art Frames"),
+        SamplePhotoItem("art-nautical-bay", "Nautical Bay", "Maritime anchor and sea harbor breeze", "samples/nautical-bay.webp", "Art Frames"),
+        SamplePhotoItem("art-pastel-dream", "Pastel Dream", "Soft pastel cloudscape dreamland", "samples/pastel-dream.webp", "Art Frames"),
+        SamplePhotoItem("art-rainy-april", "Rainy April", "Fresh spring raindrops and umbrellas", "samples/rainy-april.webp", "Art Frames"),
+        SamplePhotoItem("art-royal-baroque", "Royal Baroque", "Opulent royal baroque gold motif", "samples/royal-baroque.webp", "Art Frames"),
+        SamplePhotoItem("art-safari-savanna", "Safari Savanna", "African savanna sunset and wildlife", "samples/safari-savanna.webp", "Art Frames"),
+        SamplePhotoItem("art-sumi-ink", "Sumi Ink", "Traditional East Asian brush ink art", "samples/sumi-ink.webp", "Art Frames"),
+        SamplePhotoItem("art-travel-wonders", "Travel Wonders", "Global landmarks and travel adventure", "samples/travel-wonders.webp", "Art Frames"),
+        SamplePhotoItem("art-tropical-paradise", "Tropical Paradise", "Exotic palm beach and island vibes", "samples/tropical-paradise.webp", "Art Frames"),
+        SamplePhotoItem("art-wedding-rose", "Wedding Rose", "Elegant romantic wedding rose arch", "samples/wedding-rose.webp", "Art Frames"),
+        SamplePhotoItem("art-zen-mandala", "Zen Mandala", "Serene spiritual mandala pattern", "samples/zen-mandala.webp", "Art Frames"),
 
         // Legacy / Alias mappings to ensure compatibility with preset IDs
-        SamplePhotoItem("art-royal-gold", "Royal Gold", "Luxurious gold baroque filigree", "samples/deco-gold.png", "Art Frames"),
-        SamplePhotoItem("art-cyberpunk", "Cyberpunk HUD", "Neon cyber circuit traces", "samples/neon-grid.png", "Art Frames"),
-        SamplePhotoItem("art-jungle-ivy", "Jungle Ivy", "Lush botanical foliage", "samples/emerald-fern.png", "Art Frames"),
-        SamplePhotoItem("art-cosmic-galaxy", "Cosmic Vortex", "Deep space nebula", "samples/cosmic-nebula.png", "Art Frames"),
-        SamplePhotoItem("art-sakura-blossom", "Sakura Bloom", "Delicate pink cherry blossoms", "samples/sakura-night.png", "Art Frames"),
-        SamplePhotoItem("art-neon-ring", "Neon Ring", "Vibrant circular light halo", "samples/festival-lights.png", "Art Frames"),
-        SamplePhotoItem("art-ocean-waves", "Ocean Surf", "Dynamic cobalt wave swell", "samples/great-wave.png", "Art Frames"),
-        SamplePhotoItem("art-mecha-steel", "Mecha Armor", "Industrial steel plates", "samples/steampunk.png", "Art Frames"),
-        SamplePhotoItem("art-memphis-pop", "Memphis Pop", "Geometric color blocks", "samples/groovy-70s.png", "Art Frames"),
-        SamplePhotoItem("art-retro-synthwave", "Synthwave Sunset", "Tropical palms & horizon", "samples/neon-grid.png", "Art Frames"),
-        SamplePhotoItem("art-fiery-rose", "Ember Rose", "Glowing rose vines", "samples/ember-roses.png", "Art Frames"),
-        SamplePhotoItem("art-purple-wisteria", "Purple Wisteria", "Cascading lavender blossoms", "samples/wisteria-glow.png", "Art Frames"),
-        SamplePhotoItem("art-red-matrix", "Red Matrix", "Crimson sci-fi circuit HUD", "samples/neon-grid.png", "Art Frames"),
-        SamplePhotoItem("art-3d-bubbles", "Liquid Bubbles", "Glossy glassmorphic spheres", "samples/holo-chrome.png", "Art Frames"),
-        SamplePhotoItem("art-neon-voxels", "Neon Voxels", "Floating 3D isometric cubes", "samples/pixel-voxel.png", "Art Frames"),
+        SamplePhotoItem("art-royal-gold", "Royal Gold", "Luxurious gold baroque filigree", "samples/deco-gold.webp", "Art Frames"),
+        SamplePhotoItem("art-cyberpunk", "Cyberpunk HUD", "Neon cyber circuit traces", "samples/neon-grid.webp", "Art Frames"),
+        SamplePhotoItem("art-jungle-ivy", "Jungle Ivy", "Lush botanical foliage", "samples/emerald-fern.webp", "Art Frames"),
+        SamplePhotoItem("art-cosmic-galaxy", "Cosmic Vortex", "Deep space nebula", "samples/cosmic-nebula.webp", "Art Frames"),
+        SamplePhotoItem("art-sakura-blossom", "Sakura Bloom", "Delicate pink cherry blossoms", "samples/sakura-night.webp", "Art Frames"),
+        SamplePhotoItem("art-neon-ring", "Neon Ring", "Vibrant circular light halo", "samples/festival-lights.webp", "Art Frames"),
+        SamplePhotoItem("art-ocean-waves", "Ocean Surf", "Dynamic cobalt wave swell", "samples/great-wave.webp", "Art Frames"),
+        SamplePhotoItem("art-mecha-steel", "Mecha Armor", "Industrial steel plates", "samples/steampunk.webp", "Art Frames"),
+        SamplePhotoItem("art-memphis-pop", "Memphis Pop", "Geometric color blocks", "samples/groovy-70s.webp", "Art Frames"),
+        SamplePhotoItem("art-retro-synthwave", "Synthwave Sunset", "Tropical palms & horizon", "samples/neon-grid.webp", "Art Frames"),
+        SamplePhotoItem("art-fiery-rose", "Ember Rose", "Glowing rose vines", "samples/ember-roses.webp", "Art Frames"),
+        SamplePhotoItem("art-purple-wisteria", "Purple Wisteria", "Cascading lavender blossoms", "samples/wisteria-glow.webp", "Art Frames"),
+        SamplePhotoItem("art-red-matrix", "Red Matrix", "Crimson sci-fi circuit HUD", "samples/neon-grid.webp", "Art Frames"),
+        SamplePhotoItem("art-3d-bubbles", "Liquid Bubbles", "Glossy glassmorphic spheres", "samples/holo-chrome.webp", "Art Frames"),
+        SamplePhotoItem("art-neon-voxels", "Neon Voxels", "Floating 3D isometric cubes", "samples/pixel-voxel.webp", "Art Frames"),
 
         // Scenery & Textures
         SamplePhotoItem("mountain", "Summit", "Mountain peak against crisp alpine horizon", "samples/mountain.jpg", "Scenery"),
@@ -106,12 +106,23 @@ object SamplePhotos {
         SamplePhotoItem("tide", "Tide", "Ocean swell foam and turquoise sea wash", "samples/tide.jpg", "Scenery")
     )
 
+    @Volatile
+    var appContext: Context? = null
+
     private val sampleThumbnails = java.util.concurrent.ConcurrentHashMap<String, Bitmap>()
 
-    fun getThumbnail(context: Context, id: String, sizePx: Int = 160): Bitmap {
-        return sampleThumbnails.getOrPut(id) {
-            loadSampleBitmap(context, id, sizePx)
+    fun getThumbnail(context: Context?, id: String, sizePx: Int = 160): Bitmap {
+        if (context != null && appContext == null) {
+            appContext = context.applicationContext
         }
+        val ctx = context ?: appContext
+        if (ctx != null) {
+            val key = "${id}_$sizePx"
+            return sampleThumbnails.getOrPut(key) {
+                loadSampleBitmap(ctx, id, sizePx)
+            }
+        }
+        return createFallbackBitmap(id, sizePx)
     }
 
     fun loadSampleBitmap(context: Context, id: String, sizePx: Int = 1024): Bitmap {

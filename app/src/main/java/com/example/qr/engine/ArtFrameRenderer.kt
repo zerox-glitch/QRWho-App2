@@ -47,6 +47,7 @@ object ArtFrameRenderer {
             "art-crystal-geode" -> renderAmethystGeode(canvas, s)
             "art-neon-noir" -> renderNeonNoir(canvas, s)
             "art-solar-flare" -> renderSolarFlare(canvas, s)
+            else -> renderRoyalGold(canvas, s)
         }
     }
 

@@ -24,7 +24,9 @@ data class QrPayload(
     // Wi-Fi
     val wifiSsid: String = "Studio_WiFi",
     val wifiPassword: String = "qrwho2026",
-    val wifiEncryption: String = "WPA", // WPA, WEP, nopass
+    val wifiEncryption: String = "WPA", // WPA, WPA2, WPA3, WEP, WPS, nopass
+    val wifiWpsMethod: String = "PIN", // PIN, PBC
+    val wifiWpsPin: String = "12345670",
     val wifiHidden: Boolean = false,
     // Contact / vCard
     val vcardFirstName: String = "QRWho",
@@ -72,9 +74,24 @@ data class QrPayload(
                 else "https://qrwho.vercel.app"
             }
             PayloadKind.WIFI -> {
-                val enc = wifiEncryption.ifEmpty { "WPA" }
+                val enc = when (wifiEncryption) {
+                    "WPA2", "WPA" -> "WPA"
+                    "WPA3" -> "WPA3"
+                    "WEP" -> "WEP"
+                    "WPS" -> "WPS"
+                    "nopass", "Open" -> "nopass"
+                    else -> wifiEncryption.ifEmpty { "WPA" }
+                }
                 val h = if (wifiHidden) "H:true;" else ""
-                val p = if (enc == "nopass" || wifiPassword.isEmpty()) "" else "P:${escapeWifi(wifiPassword)};"
+                val p = when {
+                    enc == "nopass" -> ""
+                    enc == "WPS" -> {
+                        if (wifiWpsMethod == "PIN" && wifiWpsPin.isNotEmpty()) "P:${escapeWifi(wifiWpsPin)};"
+                        else if (wifiPassword.isNotEmpty()) "P:${escapeWifi(wifiPassword)};"
+                        else ""
+                    }
+                    else -> if (wifiPassword.isEmpty()) "" else "P:${escapeWifi(wifiPassword)};"
+                }
                 "WIFI:S:${escapeWifi(wifiSsid)};T:$enc;$p$h;"
             }
             PayloadKind.VCARD -> {

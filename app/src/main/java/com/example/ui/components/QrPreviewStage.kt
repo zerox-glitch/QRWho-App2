@@ -63,6 +63,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.material.icons.automirrored.filled.Undo
 import com.example.qr.engine.ScanCheckResult
 import com.example.ui.theme.AmberWarning
 import com.example.ui.theme.BeaconRose
@@ -91,7 +93,11 @@ fun QrPreviewStage(
     photoBitmap: Bitmap? = null,
     onRemovePhoto: (() -> Unit)? = null,
     onSaveCustomPreset: (() -> Unit)? = null,
-    isOptimizing: Boolean = false
+    isOptimizing: Boolean = false,
+    canUndo: Boolean = false,
+    canRedo: Boolean = false,
+    onUndo: (() -> Unit)? = null,
+    onRedo: (() -> Unit)? = null
 ) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
@@ -259,7 +265,98 @@ fun QrPreviewStage(
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Stage Quick Action Bar: Undo, Redo & Save Look
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Undo / Redo Controls
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(1.dp, if (canUndo) ElectricCyan.copy(alpha = 0.5f) else CardBorder, RoundedCornerShape(10.dp))
+                            .clickable(enabled = canUndo) { onUndo?.invoke() }
+                            .testTag("undo_button"),
+                        color = if (canUndo) ElectricCyan.copy(alpha = 0.15f) else SurfaceDark
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Undo,
+                                contentDescription = "Undo change",
+                                tint = if (canUndo) ElectricCyan else TextMuted,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Undo",
+                                color = if (canUndo) ElectricCyan else TextMuted,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(1.dp, if (canRedo) ElectricCyan.copy(alpha = 0.5f) else CardBorder, RoundedCornerShape(10.dp))
+                            .clickable(enabled = canRedo) { onRedo?.invoke() }
+                            .testTag("redo_button"),
+                        color = if (canRedo) ElectricCyan.copy(alpha = 0.15f) else SurfaceDark
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Redo,
+                                contentDescription = "Redo change",
+                                tint = if (canRedo) ElectricCyan else TextMuted,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Redo",
+                                color = if (canRedo) ElectricCyan else TextMuted,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                if (onSaveCustomPreset != null) {
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(1.dp, EmeraldGreen.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                            .clickable { onSaveCustomPreset() }
+                            .testTag("stage_save_preset_button"),
+                        color = EmeraldGreen.copy(alpha = 0.12f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.BookmarkAdd, contentDescription = null, tint = EmeraldGreen, modifier = Modifier.size(13.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Save Look", color = EmeraldGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
 
             // The Rendered QR Code Preview
             Box(

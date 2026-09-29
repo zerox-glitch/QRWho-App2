@@ -59,6 +59,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.material.icons.automirrored.filled.Undo
 import com.example.R
 import com.example.ui.StudioViewModel
 import com.example.ui.components.QrPreviewStage
@@ -118,6 +120,8 @@ fun StudioScreen(
     val favoriteIds by viewModel.favoriteIds.collectAsStateWithLifecycle()
     val presetFilterCategory by viewModel.presetFilterCategory.collectAsStateWithLifecycle()
     val historyFilter by viewModel.historyFilter.collectAsStateWithLifecycle()
+    val canUndo by viewModel.canUndo.collectAsStateWithLifecycle()
+    val canRedo by viewModel.canRedo.collectAsStateWithLifecycle()
 
     var showSavePresetDialog by remember { mutableStateOf(false) }
     var newPresetName by remember { mutableStateOf("") }
@@ -427,6 +431,10 @@ fun StudioScreen(
                 showSavePresetDialog = true
             },
             isOptimizing = isOptimizing,
+            canUndo = canUndo,
+            canRedo = canRedo,
+            onUndo = { viewModel.undo() },
+            onRedo = { viewModel.redo() },
             modifier = Modifier.padding(bottom = 18.dp)
         )
 

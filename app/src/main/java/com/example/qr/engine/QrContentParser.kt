@@ -105,9 +105,9 @@ object QrContentParser {
                 title = "Wi-Fi: $ssid",
                 subtitle = sub,
                 badgeLabel = "WI-FI",
-                primaryButtonLabel = if (pwd.isNotEmpty()) "Copy Wi-Fi Password" else "Copy SSID",
+                primaryButtonLabel = if (pwd.isNotEmpty()) "Copy Password" else "Copy SSID",
                 primaryButtonIcon = Icons.Default.Wifi,
-                secondaryButtonLabel = "Copy Full Details",
+                secondaryButtonLabel = "Copy",
                 copyableText = if (pwd.isNotEmpty()) pwd else ssid
             )
         }
@@ -128,9 +128,9 @@ object QrContentParser {
                 title = fn,
                 subtitle = sub,
                 badgeLabel = "CONTACT",
-                primaryButtonLabel = if (tel.isNotEmpty()) "Call $tel" else "Add Contact",
+                primaryButtonLabel = if (tel.isNotEmpty()) "Call Contact" else "Add Contact",
                 primaryButtonIcon = if (tel.isNotEmpty()) Icons.Default.Phone else Icons.Default.ContactPage,
-                secondaryButtonLabel = "Copy Contact",
+                secondaryButtonLabel = "Copy",
                 copyableText = trimmed
             )
         }
@@ -143,9 +143,9 @@ object QrContentParser {
                 title = "Phone Call",
                 subtitle = phone,
                 badgeLabel = "PHONE",
-                primaryButtonLabel = "Call $phone",
+                primaryButtonLabel = "Call Number",
                 primaryButtonIcon = Icons.Default.Phone,
-                secondaryButtonLabel = "Copy Number",
+                secondaryButtonLabel = "Copy",
                 copyableText = phone
             )
         }
