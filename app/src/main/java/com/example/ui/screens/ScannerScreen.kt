@@ -68,6 +68,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -1867,7 +1868,7 @@ fun ScannerScreen(
                                 .weight(1f),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(batchItems, key = { it.id }) { item ->
+                            itemsIndexed(batchItems, key = { index, item -> "${item.id}_$index" }) { _, item ->
                                 val parsed = remember(item.text) { QrContentParser.parse(item.text) }
                                 val timeFormat = remember { java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()) }
                                 val formattedTime = remember(item.timestamp) { timeFormat.format(java.util.Date(item.timestamp)) }

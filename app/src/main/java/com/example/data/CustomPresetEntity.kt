@@ -5,7 +5,9 @@ import androidx.room.PrimaryKey
 import com.example.qr.engine.EyeShape
 import com.example.qr.engine.FrameStyle
 import com.example.qr.engine.GradientType
+import com.example.qr.engine.ImageMode
 import com.example.qr.engine.ModuleShape
+import com.example.qr.engine.QrEffect
 import com.example.qr.engine.QrPreset
 import com.example.qr.engine.QrStyle
 
@@ -32,6 +34,11 @@ data class CustomPresetEntity(
     val dotScale: Float = 0.88f,
     val contrast: Float = 1.0f,
     val ecc: String = "H",
+    val effect: String = "None",
+    val effectIntensity: Float = 1.0f,
+    val artDirection: String? = null,
+    val imageMode: String = "None",
+    val imageOpacity: Float = 0.86f,
     val timestamp: Long = System.currentTimeMillis()
 ) {
     fun toQrPreset(): QrPreset {
@@ -51,7 +58,12 @@ data class CustomPresetEntity(
             moduleGap = moduleGap,
             dotScale = dotScale,
             contrast = contrast,
-            ecc = ecc
+            imageMode = try { ImageMode.valueOf(imageMode) } catch (_: Exception) { ImageMode.None },
+            imageOpacity = imageOpacity,
+            ecc = ecc,
+            effect = try { QrEffect.valueOf(effect) } catch (_: Exception) { QrEffect.None },
+            effectIntensity = effectIntensity,
+            artDirection = artDirection
         )
         return QrPreset(
             id = "custom_$id",

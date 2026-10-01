@@ -502,12 +502,12 @@ fun QrPreviewStage(
                 OutlinedButton(
                     onClick = onShare,
                     modifier = Modifier
-                        .weight(0.9f)
+                        .weight(1f)
                         .height(36.dp)
                         .testTag("share_button"),
                     border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
                     shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 4.dp)
+                    contentPadding = PaddingValues(horizontal = 3.dp)
                 ) {
                     Icon(Icons.Default.Share, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(13.dp))
                     Spacer(modifier = Modifier.width(3.dp))
@@ -518,17 +518,17 @@ fun QrPreviewStage(
                     OutlinedButton(
                         onClick = onSaveCustomPreset,
                         modifier = Modifier
-                            .weight(1.1f)
+                            .weight(1f)
                             .height(36.dp)
                             .testTag("save_custom_preset_stage_button"),
                         border = androidx.compose.foundation.BorderStroke(1.dp, EmeraldGreen.copy(alpha = 0.6f)),
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.outlinedButtonColors(containerColor = EmeraldGreen.copy(alpha = 0.10f)),
-                        contentPadding = PaddingValues(horizontal = 4.dp)
+                        contentPadding = PaddingValues(horizontal = 3.dp)
                     ) {
                         Icon(Icons.Default.BookmarkAdd, contentDescription = null, tint = EmeraldGreen, modifier = Modifier.size(13.dp))
                         Spacer(modifier = Modifier.width(3.dp))
-                        Text("Save Preset", color = EmeraldGreen, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+                        Text("Save Preset", color = EmeraldGreen, fontWeight = FontWeight.Bold, fontSize = 10.sp, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                     }
                 }
 
@@ -551,7 +551,7 @@ fun QrPreviewStage(
                     } else {
                         ButtonDefaults.outlinedButtonColors()
                     },
-                    contentPadding = PaddingValues(horizontal = 4.dp)
+                    contentPadding = PaddingValues(horizontal = 3.dp)
                 ) {
                     Icon(
                         imageVector = if (justSavedHistory) Icons.Default.Check else Icons.Default.BookmarkAdd,

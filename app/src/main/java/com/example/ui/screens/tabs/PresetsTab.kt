@@ -140,7 +140,7 @@ fun PresetsTab(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Search 335+ artistic presets...", color = TextMuted, fontSize = 13.sp) },
+            placeholder = { Text("Search 400+ artistic presets...", color = TextMuted, fontSize = 13.sp) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextMuted, modifier = Modifier.size(18.dp)) },
             trailingIcon = {
                 if (searchQuery.isNotEmpty()) {
@@ -329,7 +329,7 @@ fun PresetsTab(
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFB800), contentColor = Color(0xFF0C0C0B)),
                             shape = RoundedCornerShape(10.dp)
                         ) {
-                            Text("Browse All 335+ Presets", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("Browse All 400+ Presets", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                     } else if (selectedCategory.startsWith("✨ My Presets")) {
                         Button(

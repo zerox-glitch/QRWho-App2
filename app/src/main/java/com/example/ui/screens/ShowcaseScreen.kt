@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -101,7 +102,7 @@ fun ShowcaseScreen(
         }
     }
 
-    val allPresets = QrPresets.list
+    val allPresets = remember(QrPresets.list.size) { QrPresets.mixedList }
     val categories = remember(favoriteIds.size) {
         listOf("All", "★ Favorites (${favoriteIds.size})") + QrPresets.categories.filter { it != "All" }
     }
@@ -128,7 +129,7 @@ fun ShowcaseScreen(
     }
 
     val visiblePresets = remember(filteredPresets, displayCount) {
-        filteredPresets.take(displayCount)
+        filteredPresets.distinctBy { it.id }.take(displayCount)
     }
 
     Box(
@@ -307,14 +308,14 @@ fun ShowcaseScreen(
                                 colors = ButtonDefaults.buttonColors(containerColor = ElectricCyan, contentColor = Color(0xFF0C0C0B)),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text("Browse All 335+ Presets", fontWeight = FontWeight.Bold)
+                                Text("Browse All 400+ Presets", fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                 }
             }
 
-            items(visiblePresets, key = { it.id }) { preset ->
+            itemsIndexed(visiblePresets, key = { index, preset -> "${preset.id}_$index" }) { _, preset ->
                 ShowcasePresetCard(
                     preset = preset,
                     isFavorite = favoriteIds.contains(preset.id),

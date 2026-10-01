@@ -52,12 +52,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.CustomPresetEntity
+import com.example.qr.engine.QrGenerator
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.Image
 import com.example.data.QrEntity
 import com.example.ui.theme.BeaconRose
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.CardDark
 import com.example.ui.theme.ElectricCyan
 import com.example.ui.theme.EmeraldGreen
+import com.example.ui.theme.NeonViolet
 import com.example.ui.theme.SurfaceDark
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
@@ -74,10 +79,14 @@ fun HistoryTab(
     onDeleteItem: (Long) -> Unit,
     onClearAll: () -> Unit,
     onClearByType: (Boolean) -> Unit = {},
+    customPresets: List<CustomPresetEntity> = emptyList(),
+    onLoadCustomPreset: (CustomPresetEntity) -> Unit = {},
+    onDeleteCustomPreset: (Long) -> Unit = {},
     initialFilter: String = "All",
     onFilterSelected: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val dateFormat = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
     var selectedFilter by remember { mutableStateOf(initialFilter) }
     var showClearDialog by remember { mutableStateOf(false) }
@@ -116,22 +125,24 @@ fun HistoryTab(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 listOf(
-                    Pair("All", historyList.size),
+                    Pair("All", historyList.size + customPresets.size),
+                    Pair("My Presets", customPresets.size),
                     Pair("Created", createdList.size),
                     Pair("Scanned", scannedList.size)
                 ).forEach { (label, count) ->
                     val isSelected = selectedFilter == label
+                    val activeColor = if (label == "My Presets") NeonViolet else ElectricCyan
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(16.dp))
-                            .background(if (isSelected) ElectricCyan.copy(alpha = 0.2f) else CardDark)
-                            .border(1.dp, if (isSelected) ElectricCyan else CardBorder, RoundedCornerShape(16.dp))
+                            .background(if (isSelected) activeColor.copy(alpha = 0.2f) else CardDark)
+                            .border(1.dp, if (isSelected) activeColor else CardBorder, RoundedCornerShape(16.dp))
                             .clickable { selectedFilter = label }
                             .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
                         Text(
                             text = "$label ($count)",
-                            color = if (isSelected) ElectricCyan else TextSecondary,
+                            color = if (isSelected) activeColor else TextSecondary,
                             fontSize = 11.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                         )
@@ -139,7 +150,7 @@ fun HistoryTab(
                 }
             }
 
-            if (historyList.isNotEmpty()) {
+            if (historyList.isNotEmpty() && selectedFilter != "My Presets") {
                 Text(
                     text = "Clear...",
                     color = BeaconRose,
@@ -153,7 +164,122 @@ fun HistoryTab(
             }
         }
 
-        if (filteredList.isEmpty()) {
+        if (selectedFilter == "My Presets") {
+            if (customPresets.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = "No presets",
+                            tint = NeonViolet,
+                            modifier = Modifier.size(44.dp)
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "No saved custom presets yet",
+                            color = TextSecondary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Customize styling in Design tab and tap 'Save as Preset' to store it here.",
+                            color = TextMuted,
+                            fontSize = 11.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    customPresets.forEach { presetEntity ->
+                        val presetObj = remember(presetEntity) { presetEntity.toQrPreset() }
+                        val presetThumb = remember(presetEntity.id, presetObj.style) {
+                            QrGenerator.getOrGenerateThumbnail(presetObj.style, 120, context)
+                        }
+
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .border(1.dp, CardBorder, RoundedCornerShape(14.dp))
+                                .clickable { onLoadCustomPreset(presetEntity) }
+                                .testTag("vault_tab_preset_${presetEntity.id}"),
+                            color = CardDark
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(46.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(androidx.compose.ui.graphics.Color(presetObj.style.bgColor))
+                                        .border(1.dp, CardBorder, RoundedCornerShape(8.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Image(
+                                        bitmap = presetThumb.asImageBitmap(),
+                                        contentDescription = presetEntity.name,
+                                        modifier = Modifier.size(42.dp).clip(RoundedCornerShape(6.dp))
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(10.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = presetEntity.name,
+                                            color = TextPrimary,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(NeonViolet.copy(alpha = 0.2f))
+                                                .padding(horizontal = 5.dp, vertical = 1.dp)
+                                        ) {
+                                            Text("PRESET", color = NeonViolet, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = presetEntity.description.ifBlank { "${presetEntity.moduleShape} · ${presetEntity.eyeShape}" },
+                                        color = TextMuted,
+                                        fontSize = 10.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                IconButton(
+                                    onClick = { onDeleteCustomPreset(presetEntity.id) },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.DeleteOutline,
+                                        contentDescription = "Delete preset",
+                                        tint = TextMuted,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else if (filteredList.isEmpty() && (selectedFilter != "All" || customPresets.isEmpty())) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -193,6 +319,89 @@ fun HistoryTab(
             }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // If on All tab, display saved custom presets at the top
+                if (selectedFilter == "All" && customPresets.isNotEmpty()) {
+                    customPresets.forEach { presetEntity ->
+                        val presetObj = remember(presetEntity) { presetEntity.toQrPreset() }
+                        val presetThumb = remember(presetEntity.id, presetObj.style) {
+                            QrGenerator.getOrGenerateThumbnail(presetObj.style, 120, context)
+                        }
+
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .border(1.dp, CardBorder, RoundedCornerShape(14.dp))
+                                .clickable { onLoadCustomPreset(presetEntity) }
+                                .testTag("vault_tab_preset_${presetEntity.id}"),
+                            color = CardDark
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(46.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(androidx.compose.ui.graphics.Color(presetObj.style.bgColor))
+                                        .border(1.dp, CardBorder, RoundedCornerShape(8.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Image(
+                                        bitmap = presetThumb.asImageBitmap(),
+                                        contentDescription = presetEntity.name,
+                                        modifier = Modifier.size(42.dp).clip(RoundedCornerShape(6.dp))
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(10.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = presetEntity.name,
+                                            color = TextPrimary,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(NeonViolet.copy(alpha = 0.2f))
+                                                .padding(horizontal = 5.dp, vertical = 1.dp)
+                                        ) {
+                                            Text("PRESET", color = NeonViolet, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = presetEntity.description.ifBlank { "${presetEntity.moduleShape} · ${presetEntity.eyeShape}" },
+                                        color = TextMuted,
+                                        fontSize = 10.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                IconButton(
+                                    onClick = { onDeleteCustomPreset(presetEntity.id) },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.DeleteOutline,
+                                        contentDescription = "Delete preset",
+                                        tint = TextMuted,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
                 filteredList.forEach { item ->
                     Surface(
                         modifier = Modifier

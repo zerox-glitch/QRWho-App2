@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
@@ -96,10 +98,12 @@ fun HistoryScreen(
     viewModel: StudioViewModel,
     onNavigateToStudio: () -> Unit,
     onNavigateToScanner: () -> Unit,
+    onOpenSettings: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val historyList by viewModel.historyList.collectAsStateWithLifecycle()
+    val customPresets by viewModel.customPresets.collectAsStateWithLifecycle()
     val dateFormat = remember { SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()) }
 
     var searchQuery by remember { mutableStateOf("") }
@@ -108,6 +112,17 @@ fun HistoryScreen(
 
     val createdList = remember(historyList) { historyList.filter { !it.isScanned } }
     val scannedList = remember(historyList) { historyList.filter { it.isScanned } }
+
+    val filteredCustomPresets = remember(customPresets, searchQuery) {
+        val query = searchQuery.trim().lowercase()
+        if (query.isEmpty()) {
+            customPresets
+        } else {
+            customPresets.filter {
+                it.name.lowercase().contains(query) || it.description.lowercase().contains(query)
+            }
+        }
+    }
 
     val filteredList = remember(historyList, selectedFilter, searchQuery) {
         val query = searchQuery.trim().lowercase()
@@ -231,9 +246,10 @@ fun HistoryScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             listOf(
-                Triple("All", historyList.size, ElectricCyan),
+                Triple("All", historyList.size + customPresets.size, ElectricCyan),
                 Triple("Created", createdList.size, EmeraldGreen),
-                Triple("Scanned", scannedList.size, NeonViolet)
+                Triple("My Presets", customPresets.size, NeonViolet),
+                Triple("Scanned", scannedList.size, BeaconRose)
             ).forEach { (label, count, accentColor) ->
                 val isSelected = selectedFilter == label
                 Box(
@@ -255,7 +271,176 @@ fun HistoryScreen(
         }
 
         // Content Area
-        if (filteredList.isEmpty()) {
+        if (selectedFilter == "My Presets") {
+            if (filteredCustomPresets.isEmpty()) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .clip(RoundedCornerShape(16.dp))
+                        .border(1.dp, CardBorder, RoundedCornerShape(16.dp)),
+                    color = CardDark
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(NeonViolet.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = NeonViolet, modifier = Modifier.size(28.dp))
+                        }
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = "No Custom Presets Saved",
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Customize shapes, colors, and 3D effects in the Studio Design tab, then tap 'Save as Preset' to keep them in your Vault!",
+                            color = TextMuted,
+                            fontSize = 12.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = onNavigateToStudio,
+                            colors = ButtonDefaults.buttonColors(containerColor = NeonViolet, contentColor = Color.White),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Open Studio to Create Style", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 80.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    itemsIndexed(filteredCustomPresets, key = { index, item -> "cp_${item.id}_$index" }) { _, presetEntity ->
+                        val presetObj = remember(presetEntity) { presetEntity.toQrPreset() }
+                        val presetThumb = remember(presetEntity.id, presetObj.style) {
+                            QrGenerator.getOrGenerateThumbnail(presetObj.style, 120, context)
+                        }
+
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
+                                .clickable {
+                                    viewModel.loadCustomPreset(presetEntity)
+                                    onNavigateToStudio()
+                                }
+                                .testTag("vault_custom_preset_${presetEntity.id}"),
+                            color = CardDark
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(54.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(Color(presetObj.style.bgColor))
+                                            .border(1.dp, CardBorder, RoundedCornerShape(10.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Image(
+                                            bitmap = presetThumb.asImageBitmap(),
+                                            contentDescription = presetEntity.name,
+                                            modifier = Modifier
+                                                .size(50.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = presetEntity.name,
+                                                color = TextPrimary,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .background(NeonViolet.copy(alpha = 0.15f))
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = "PRESET",
+                                                    color = NeonViolet,
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Text(
+                                            text = presetEntity.description.ifBlank { "${presetEntity.moduleShape} · ${presetEntity.eyeShape}" },
+                                            color = TextMuted,
+                                            fontSize = 11.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Text(
+                                            text = "Effect: ${presetEntity.effect} · ${dateFormat.format(Date(presetEntity.timestamp))}",
+                                            color = TextSecondary,
+                                            fontSize = 10.sp
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = { viewModel.deleteCustomPreset(presetEntity.id) },
+                                        modifier = Modifier.size(34.dp)
+                                    ) {
+                                        Icon(Icons.Default.DeleteOutline, contentDescription = "Delete", tint = TextMuted, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Button(
+                                    onClick = {
+                                        viewModel.selectPreset(presetObj)
+                                        onNavigateToStudio()
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = NeonViolet, contentColor = Color.White),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(36.dp)
+                                ) {
+                                    Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Load Preset into Studio", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else if (filteredList.isEmpty()) {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -370,7 +555,105 @@ fun HistoryScreen(
                 contentPadding = PaddingValues(bottom = 80.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(filteredList, key = { it.id }) { item ->
+                if (selectedFilter == "All" && filteredCustomPresets.isNotEmpty()) {
+                    itemsIndexed(filteredCustomPresets, key = { index, item -> "custom_${item.id}_$index" }) { _, presetEntity ->
+                        val presetObj = remember(presetEntity) { presetEntity.toQrPreset() }
+                        val presetThumb = remember(presetEntity.id, presetObj.style) {
+                            QrGenerator.getOrGenerateThumbnail(presetObj.style, 120, context)
+                        }
+
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
+                                .clickable {
+                                    viewModel.loadCustomPreset(presetEntity)
+                                    onNavigateToStudio()
+                                }
+                                .testTag("vault_custom_preset_${presetEntity.id}"),
+                            color = CardDark
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(54.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(Color(presetObj.style.bgColor))
+                                            .border(1.dp, CardBorder, RoundedCornerShape(10.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Image(
+                                            bitmap = presetThumb.asImageBitmap(),
+                                            contentDescription = presetEntity.name,
+                                            modifier = Modifier
+                                                .size(50.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = presetEntity.name,
+                                                color = TextPrimary,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .background(NeonViolet.copy(alpha = 0.15f))
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = "PRESET",
+                                                    color = NeonViolet,
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Text(
+                                            text = presetEntity.description.ifBlank { "${presetEntity.moduleShape} · ${presetEntity.eyeShape}" },
+                                            color = TextMuted,
+                                            fontSize = 11.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Text(
+                                            text = "Effect: ${presetEntity.effect} · ${dateFormat.format(Date(presetEntity.timestamp))}",
+                                            color = TextSecondary,
+                                            fontSize = 10.sp
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = { viewModel.deleteCustomPreset(presetEntity.id) },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.DeleteOutline,
+                                            contentDescription = "Delete Preset",
+                                            tint = TextMuted,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                itemsIndexed(filteredList, key = { index, item -> "hist_${item.id}_$index" }) { _, item ->
                     HistoryItemCard(
                         item = item,
                         dateFormat = dateFormat,

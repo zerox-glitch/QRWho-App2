@@ -187,7 +187,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
 
     init {
         com.example.qr.engine.SamplePhotos.appContext = application.applicationContext
-        // Initialize presets from assets (all 335 items)
+        // Initialize presets from assets (all 400+ items)
         QrPresets.initialize(application)
         if (!restoreDraftState()) {
             loadDefaultDesign()
@@ -439,13 +439,19 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
         } else {
+            // Preset does NOT use an art frame.
+            // If previous photo was just an automatic sample photo from an art frame, clear it so it doesn't corrupt this preset!
+            if (samplePhotoId != null) {
+                _photoBitmap.value = null
+                samplePhotoId = null
+            }
             val currentPhoto = _photoBitmap.value
             val currentMode = _style.value.imageMode
             val hasPhoto = currentPhoto != null
             val isPhotoMode = currentMode != ImageMode.None && currentMode != ImageMode.Logo
 
             if (hasPhoto) {
-                // Keep selected photo active with the new preset style
+                // Keep explicitly uploaded user photo active with the new preset style
                 val targetMode = if (preset.style.imageMode != ImageMode.None) {
                     preset.style.imageMode
                 } else if (isPhotoMode) {
@@ -555,7 +561,12 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                 moduleGap = s.moduleGap,
                 dotScale = s.dotScale,
                 contrast = s.contrast,
-                ecc = s.ecc
+                ecc = s.ecc,
+                effect = s.effect.name,
+                effectIntensity = s.effectIntensity,
+                artDirection = s.artDirection,
+                imageMode = s.imageMode.name,
+                imageOpacity = s.imageOpacity
             )
             repository.saveCustomPreset(entity)
             withContext(Dispatchers.Main) {
@@ -564,6 +575,14 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                 _userMessage.value = "Saved '${entity.name}' to My Presets!"
             }
         }
+    }
+
+    fun loadCustomPreset(presetEntity: CustomPresetEntity) {
+        recordUndoState()
+        val preset = presetEntity.toQrPreset()
+        selectPreset(preset)
+        _activeStudioTab.value = 0
+        _userMessage.value = "Loaded preset '${presetEntity.name}' from Vault into Studio!"
     }
 
     fun deleteCustomPreset(id: Long) {
@@ -662,7 +681,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                     customLogo = currentLogo,
                     sizePx = 1024
                 )
-                val evalResult = QrScannabilityEvaluator.evaluate(bmp)
+                val evalResult = QrScannabilityEvaluator.evaluate(bmp, result.style)
 
                 withContext(Dispatchers.Main) {
                     _style.value = result.style
@@ -703,7 +722,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                     sizePx = 1024
                 )
 
-                val evalResult = QrScannabilityEvaluator.evaluate(bmp)
+                val evalResult = QrScannabilityEvaluator.evaluate(bmp, currentStyle)
 
                 withContext(Dispatchers.Main) {
                     _qrBitmap.value = bmp
@@ -831,6 +850,9 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                 imageMode = style.imageMode.name,
                 imageOpacity = style.imageOpacity,
                 ecc = style.ecc,
+                effect = style.effect.name,
+                effectIntensity = style.effectIntensity,
+                artDirection = style.artDirection,
                 scanScore = _scanResult.value?.score ?: 98
             )
             repository.saveQr(entity)
@@ -883,6 +905,9 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
 
+        val restoredEffect = try { QrEffect.valueOf(entity.effect) } catch (_: Exception) { QrEffect.None }
+        val restoredArtDirection = entity.artDirection ?: entity.presetName
+
         val restoredStyle = QrStyle(
             moduleShape = try { ModuleShape.valueOf(entity.moduleShape) } catch (_: Exception) { ModuleShape.Rounded },
             eyeShape = try { EyeShape.valueOf(entity.eyeShape) } catch (_: Exception) { EyeShape.Rounded },
@@ -902,13 +927,35 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
             imageMode = try { ImageMode.valueOf(entity.imageMode) } catch (_: Exception) { ImageMode.None },
             imageOpacity = entity.imageOpacity,
             ecc = entity.ecc,
-            artDirection = entity.presetName
+            artDirection = restoredArtDirection,
+            effect = restoredEffect,
+            effectIntensity = entity.effectIntensity
         )
 
         _payload.value = restoredPayload
         _style.value = restoredStyle
-        _userMessage.value = "Restored '${entity.title}' into Studio!"
+
+        if (restoredArtDirection != null && ArtFrameRenderer.isArtFrame(restoredArtDirection)) {
+            viewModelScope.launch(Dispatchers.IO) {
+                val bmp = SamplePhotos.loadSampleBitmap(getApplication(), restoredArtDirection, 1024)
+                withContext(Dispatchers.Main) {
+                    _photoBitmap.value = bmp
+                    samplePhotoId = restoredArtDirection
+                    triggerRender()
+                    saveDraftState()
+                }
+            }
+        } else {
+            if (samplePhotoId != null || restoredStyle.imageMode == ImageMode.None) {
+                _photoBitmap.value = null
+                samplePhotoId = null
+            }
+        }
+
+        _activeStudioTab.value = 0
+        _userMessage.value = "Loaded '${entity.title}' from Vault into Studio!"
         triggerRender()
+        saveDraftState()
     }
 
     fun shareHistoryItem(context: Context, item: QrEntity) {

@@ -22,6 +22,7 @@ import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -582,8 +583,16 @@ fun QrEffectVisualCard(
                         Offset(cell * 1.5f, cell * 1.5f)
                     )
                     val baseCol = if (isSelected) accentColor else Color(0xFFD4D4D8)
-                    val rLuma = (accentColor.red * 0.299f + accentColor.green * 0.587f + accentColor.blue * 0.114f)
-                    val vibrantGlow = if (rLuma > 0.35f) accentColor else ElectricCyan
+                    val targetGlowCol = if (isSelected) accentColor else Color(0xFF00F0FF)
+                    val hsv = FloatArray(3)
+                    android.graphics.Color.colorToHSV(targetGlowCol.toArgb(), hsv)
+                    if (hsv[2] < 0.35f) {
+                        hsv[2] = 0.85f
+                    } else {
+                        hsv[1] = (hsv[1] * 0.70f).coerceIn(0f, 1f)
+                        hsv[2] = (hsv[2] * 1.30f).coerceIn(0f, 1f)
+                    }
+                    val vibrantGlow = Color(android.graphics.Color.HSVToColor(hsv))
 
                     for (c in centers) {
                         when (effect) {

@@ -90,6 +90,23 @@ object SamplePhotos {
         SamplePhotoItem("art-red-matrix", "Red Matrix", "Crimson sci-fi circuit HUD", "samples/neon-grid.webp", "Art Frames"),
         SamplePhotoItem("art-3d-bubbles", "Liquid Bubbles", "Glossy glassmorphic spheres", "samples/holo-chrome.webp", "Art Frames"),
         SamplePhotoItem("art-neon-voxels", "Neon Voxels", "Floating 3D isometric cubes", "samples/pixel-voxel.webp", "Art Frames"),
+        SamplePhotoItem("art-aurora-borealis", "Aurora Borealis", "Emerald and violet arctic lights", "samples/aurora-night.webp", "Art Frames"),
+        SamplePhotoItem("art-cyber-samurai", "Cyber Katana", "Carbon fiber armor with neon crimson", "samples/neon-grid.webp", "Art Frames"),
+        SamplePhotoItem("art-golden-kintsugi", "Golden Kintsugi", "Ivory porcelain with molten gold veins", "samples/marble-gold.webp", "Art Frames"),
+        SamplePhotoItem("art-tropical-sunset", "Paradise Palm", "Amber to magenta tropical sunset", "samples/dusk.jpg", "Art Frames"),
+        SamplePhotoItem("art-midnight-lotus", "Midnight Lotus", "Pink lotus and jade leaves on obsidian", "samples/golden-lotus.webp", "Art Frames"),
+        SamplePhotoItem("art-holo-prism", "Holo Prism", "Iridescent rainbow foil geometry", "samples/holo-chrome.webp", "Art Frames"),
+        SamplePhotoItem("art-steam-punk", "Clockwork Chrono", "Victorian brass gears & copper cogs", "samples/steampunk.webp", "Art Frames"),
+        SamplePhotoItem("art-crystal-geode", "Amethyst Geode", "Purple quartz crystal cavern", "samples/violet-stars.webp", "Art Frames"),
+        SamplePhotoItem("art-neon-noir", "Neon Noir", "Electric violet cyber rain", "samples/violet-stars.webp", "Art Frames"),
+        SamplePhotoItem("art-solar-flare", "Solar Flare", "Radiant golden solar amber", "samples/aztec-sun.webp", "Art Frames"),
+        SamplePhotoItem("art-ukiyo", "Ukiyo Wave", "Classic woodblock ocean tsunami", "samples/great-wave.webp", "Art Frames"),
+        SamplePhotoItem("art-royal", "Royal Gold", "Luxurious gold baroque filigree", "samples/deco-gold.webp", "Art Frames"),
+        SamplePhotoItem("art-sakura", "Sakura Bloom", "Delicate pink cherry blossoms", "samples/sakura-night.webp", "Art Frames"),
+        SamplePhotoItem("art-matcha", "Matcha Latte", "Earthy green tea leaves", "samples/emerald-fern.webp", "Art Frames"),
+        SamplePhotoItem("art-solarpunk", "Solarpunk Dawn", "Golden solar amber & emerald foliage", "samples/emerald-fern.webp", "Art Frames"),
+        SamplePhotoItem("art-neon-fungi", "Neon Fungi", "Bioluminescent emerald bubbles", "samples/coral-reef.webp", "Art Frames"),
+        SamplePhotoItem("art-mono", "Mono Luxe", "Ultra-crisp geometric precision", "samples/crystal-ice.webp", "Art Frames"),
 
         // Scenery & Textures
         SamplePhotoItem("mountain", "Summit", "Mountain peak against crisp alpine horizon", "samples/mountain.jpg", "Scenery"),
@@ -126,7 +143,7 @@ object SamplePhotos {
     }
 
     fun loadSampleBitmap(context: Context, id: String, sizePx: Int = 1024): Bitmap {
-        val item = list.find { it.id == id } ?: list.first()
+        val item = list.find { it.id == id } ?: return createFallbackBitmap(id, sizePx)
         try {
             // Step 1: Decode image dimensions with bounds check
             val options = BitmapFactory.Options()

@@ -396,7 +396,7 @@ fun WelcomeScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "37+ artistic templates ready in 1-tap",
+                            text = "400+ artistic templates ready in 1-tap",
                             color = TextMuted,
                             fontSize = 11.5.sp
                         )
@@ -500,8 +500,8 @@ fun WelcomeScreen(
                 FeatureItem(
                     icon = Icons.Default.AutoAwesome,
                     color = Color(0xFFFFB800),
-                    title = "335+ Designer Presets Library",
-                    desc = "Instant 1-tap access to 335+ camera-verified artistic presets across Cyberpunk, Fungi, Matrix, Sakura, Ocean, Neon, and Frames."
+                    title = "400+ Designer Presets Library",
+                    desc = "Instant 1-tap access to 400+ camera-verified artistic presets across Cyberpunk, Fungi, Matrix, Sakura, Ocean, Neon, and Frames."
                 ),
                 FeatureItem(
                     icon = Icons.Default.Tune,

@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -253,7 +254,7 @@ fun StudioScreen(
                         )
                         Spacer(modifier = Modifier.width(3.dp))
                         Text(
-                            text = "Support ☕",
+                            text = "Support",
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             fontSize = 9.sp,
@@ -310,7 +311,7 @@ fun StudioScreen(
                 ) {
                     Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = EmeraldGreen, modifier = Modifier.size(13.dp))
                     Spacer(modifier = Modifier.width(5.dp))
-                    Text("✨ My Presets (${customPresets.size})", color = EmeraldGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("My Presets (${customPresets.size})", color = EmeraldGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -332,7 +333,7 @@ fun StudioScreen(
                 ) {
                     Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFB800), modifier = Modifier.size(13.dp))
                     Spacer(modifier = Modifier.width(5.dp))
-                    Text("★ Favorites (${favoriteIds.size})", color = Color(0xFFFFB800), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("Favorites (${favoriteIds.size})", color = Color(0xFFFFB800), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -355,7 +356,7 @@ fun StudioScreen(
                 ) {
                     Icon(Icons.Default.BookmarkAdd, contentDescription = null, tint = ElectricCyan, modifier = Modifier.size(13.dp))
                     Spacer(modifier = Modifier.width(5.dp))
-                    Text("➕ Save Look to Presets", color = ElectricCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("Save Look to Presets", color = ElectricCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -401,7 +402,7 @@ fun StudioScreen(
                     ) {
                         Icon(Icons.Default.Favorite, contentDescription = null, tint = BeaconRose, modifier = Modifier.size(13.dp))
                         Spacer(modifier = Modifier.width(5.dp))
-                        Text("❤️ Our Mission", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("Our Mission", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -530,6 +531,9 @@ fun StudioScreen(
                         onDeleteItem = { viewModel.deleteHistoryItem(it) },
                         onClearAll = { viewModel.clearAllHistory() },
                         onClearByType = { isScanned -> viewModel.clearHistoryByType(isScanned) },
+                        customPresets = customPresets,
+                        onLoadCustomPreset = { preset -> viewModel.loadCustomPreset(preset) },
+                        onDeleteCustomPreset = { viewModel.deleteCustomPreset(it) },
                         initialFilter = historyFilter,
                         onFilterSelected = { viewModel.setHistoryFilter(it) }
                     )

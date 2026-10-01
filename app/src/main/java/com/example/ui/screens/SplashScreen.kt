@@ -280,7 +280,7 @@ fun SplashScreen(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = ElectricCyan, modifier = Modifier.size(11.dp))
-                        Text("335+ Presets", color = ElectricCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("400+ Presets", color = ElectricCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 

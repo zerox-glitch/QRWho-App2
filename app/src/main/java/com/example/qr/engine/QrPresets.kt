@@ -9,7 +9,46 @@ object QrPresets {
 
     private val _presets = mutableListOf<QrPreset>()
     val list: List<QrPreset>
-        get() = if (_presets.isNotEmpty()) _presets else fallbackList
+        get() = (if (_presets.isNotEmpty()) _presets else fallbackList).distinctBy { it.id }
+
+    val mixedList: List<QrPreset>
+        get() {
+            val all = list.distinctBy { it.id }
+            if (all.isEmpty()) return emptyList()
+            val desiredCategoryOrder = listOf(
+                "Minimal & Swiss",
+                "Botanical Art",
+                "Neon & Tech",
+                "Luxury & Fashion",
+                "Nature & Organic",
+                "Retro & Vintage",
+                "Creative Art",
+                "🌟 Iconic Art Frames"
+            )
+            val grouped = all.groupBy { it.category }
+            val categoryQueues = desiredCategoryOrder.mapNotNull { cat ->
+                grouped[cat]?.toMutableList()
+            }.toMutableList()
+
+            grouped.keys.filter { it !in desiredCategoryOrder }.forEach { cat ->
+                grouped[cat]?.toMutableList()?.let { categoryQueues.add(it) }
+            }
+
+            val result = ArrayList<QrPreset>(all.size)
+            while (categoryQueues.isNotEmpty()) {
+                val iterator = categoryQueues.iterator()
+                while (iterator.hasNext()) {
+                    val queue = iterator.next()
+                    if (queue.isNotEmpty()) {
+                        result.add(queue.removeAt(0))
+                    }
+                    if (queue.isEmpty()) {
+                        iterator.remove()
+                    }
+                }
+            }
+            return result
+        }
 
     val categories: List<String> = listOf(
         "All",
@@ -40,7 +79,8 @@ object QrPresets {
                 "pro-red-matrix", "art-red-matrix",
                 "pro-sunset-palm", "art-synthwave-sunset",
                 "pro-neon-vortex", "art-neon-vortex",
-                "pro-multicolor-geo", "art-multicolor-geometric"
+                "pro-multicolor-geo", "art-multicolor-geometric",
+                "art-bioluminescent"
             )
 
             for (i in 0 until array.length()) {
@@ -62,7 +102,7 @@ object QrPresets {
 
             if (parsed.isNotEmpty()) {
                 _presets.clear()
-                _presets.addAll(parsed)
+                _presets.addAll(parsed.distinctBy { it.id })
             }
         } catch (_: Exception) {
             // Fallback is used automatically
@@ -95,14 +135,40 @@ object QrPresets {
         val frameStyleStr = o.optString("frameStyle", "none")
         val frameCaptionStr = o.optString("frameCaption", "SCAN ME")
 
+        val fgRaw = safeColor(fgStr, 0xFF0F172A.toInt())
+        val bgRaw = safeColor(bgStr, 0xFFFFFFFF.toInt())
+        val eyeRaw = safeColor(eyeColorStr, fgRaw)
+        val ballRaw = safeColor(ballColorStr, fgRaw)
+
+        val eyeIsLight = !QrGenerator.isDarkColor(eyeRaw) || !QrGenerator.isDarkColor(ballRaw)
+        val bgIsDark = QrGenerator.isDarkColor(bgRaw)
+
+        val finalBg = if (eyeIsLight) {
+            // Rule: If eyes or pupils are light colors, the background should be dark!
+            if (bgIsDark) bgRaw else 0xFF0B0F19.toInt()
+        } else {
+            // Rule: If eyes and pupils are dark, the background should be light!
+            if (!bgIsDark) bgRaw else 0xFFFFFFFF.toInt()
+        }
+
+        var finalFg = fgRaw
+        if (QrGenerator.getContrastRatio(finalFg, finalBg) < 2.8f) {
+            finalFg = if (QrGenerator.isDarkColor(finalBg)) 0xFFFFFFFF.toInt() else 0xFF0F172A.toInt()
+        }
+
+        val (finalEye, finalBall) = QrGenerator.resolveEffectiveEyeColors(
+            QrStyle(fgColor = finalFg, bgColor = finalBg, eyeColor = eyeRaw, ballColor = ballRaw),
+            finalBg
+        )
+
         return QrStyle(
             moduleShape = ModuleShape.fromString(moduleShapeStr),
             eyeShape = EyeShape.fromString(eyeShapeStr),
             ballShape = EyeShape.fromString(ballShapeStr),
-            fgColor = safeColor(fgStr, 0xFF0F172A.toInt()),
-            bgColor = safeColor(bgStr, 0xFFFFFFFF.toInt()),
-            eyeColor = safeColor(eyeColorStr, 0xFF0F172A.toInt()),
-            ballColor = safeColor(ballColorStr, 0xFF0F172A.toInt()),
+            fgColor = finalFg,
+            bgColor = finalBg,
+            eyeColor = finalEye,
+            ballColor = finalBall,
             gradientType = GradientType.fromString(gradTypeStr),
             gradientTo = safeColor(gradToStr, 0xFF7A5AF8.toInt()),
             quietZone = o.optInt("quietZone", 3),
@@ -115,7 +181,7 @@ object QrPresets {
             logoScale = o.optDouble("logoScale", 0.22).toFloat(),
             ecc = o.optString("ecc", "H"),
             artisticStrength = o.optDouble("artisticStrength", 0.5).toFloat(),
-            artDirection = o.optString("artDirection", null),
+            artDirection = o.optString("artDirection").takeIf { it.isNotBlank() },
             effect = QrEffect.fromString(o.optString("effect", "none")),
             effectIntensity = o.optDouble("effectIntensity", 1.0).toFloat(),
             frameStyle = FrameStyle.fromString(frameStyleStr),
@@ -246,8 +312,8 @@ object QrPresets {
                 ballShape = EyeShape.Circle,
                 fgColor = 0xFF2B1810.toInt(),
                 bgColor = 0xFFFFF9F9.toInt(),
-                eyeColor = 0xFFEC4899.toInt(),
-                ballColor = 0xFFBE185D.toInt(),
+                eyeColor = 0xFF831843.toInt(),
+                ballColor = 0xFF701A75.toInt(),
                 gradientType = GradientType.None,
                 quietZone = 3,
                 dotScale = 0.92f,
@@ -330,8 +396,8 @@ object QrPresets {
                 ballShape = EyeShape.Circle,
                 fgColor = 0xFF0F172A.toInt(),
                 bgColor = 0xFFF8FAFC.toInt(),
-                eyeColor = 0xFF06B6D4.toInt(),
-                ballColor = 0xFFF43F5E.toInt(),
+                eyeColor = 0xFF0E7490.toInt(),
+                ballColor = 0xFF9F1239.toInt(),
                 gradientType = GradientType.None,
                 quietZone = 3,
                 dotScale = 0.90f,
@@ -385,19 +451,19 @@ object QrPresets {
         ),
         QrPreset(
             id = "art-purple-wisteria",
-            name = "Glowing Purple Wisteria",
+            name = "Wisteria Violet Glow",
             category = "🌟 Iconic Art Frames",
-            description = "Cascading wisteria blossoms and starlight floral vines on midnight indigo",
+            description = "Imperial amethyst & lavender cascading wisteria arbour with royal gold filigree accents",
             style = QrStyle(
                 moduleShape = ModuleShape.Dots,
-                eyeShape = EyeShape.Rounded,
+                eyeShape = EyeShape.Classy,
                 ballShape = EyeShape.Circle,
-                fgColor = 0xFFC084FC.toInt(),
-                bgColor = 0xFF0B061A.toInt(),
-                eyeColor = 0xFFA855F7.toInt(),
-                ballColor = 0xFFE879F9.toInt(),
+                fgColor = 0xFFE879F9.toInt(),
+                bgColor = 0xFF1A0B2E.toInt(),
+                eyeColor = 0xFFFFD700.toInt(),
+                ballColor = 0xFFC084FC.toInt(),
                 gradientType = GradientType.Diagonal,
-                gradientTo = 0xFF818CF8.toInt(),
+                gradientTo = 0xFF9333EA.toInt(),
                 quietZone = 3,
                 dotScale = 0.90f,
                 ecc = "H",
@@ -548,10 +614,10 @@ object QrPresets {
                 ballShape = EyeShape.Circle,
                 fgColor = 0xFF2A241F.toInt(),
                 bgColor = 0xFFFAF7F2.toInt(),
-                eyeColor = 0xFFD4AF37.toInt(),
-                ballColor = 0xFFB45309.toInt(),
+                eyeColor = 0xFF451A03.toInt(),
+                ballColor = 0xFF78350F.toInt(),
                 gradientType = GradientType.Radial,
-                gradientTo = 0xFFD4AF37.toInt(),
+                gradientTo = 0xFF451A03.toInt(),
                 quietZone = 3,
                 dotScale = 0.92f,
                 ecc = "H",
@@ -568,14 +634,14 @@ object QrPresets {
                 moduleShape = ModuleShape.Rounded,
                 eyeShape = EyeShape.Rounded,
                 ballShape = EyeShape.Circle,
-                fgColor = 0xFFFFF176.toInt(),
-                bgColor = 0xFF180A2A.toInt(),
-                eyeColor = 0xFFFF4500.toInt(),
-                ballColor = 0xFFFF758C.toInt(),
+                fgColor = 0xFF0F051D.toInt(),
+                bgColor = 0xFFFFF7ED.toInt(),
+                eyeColor = 0xFF180A2A.toInt(),
+                ballColor = 0xFF180A2A.toInt(),
                 gradientType = GradientType.Linear,
-                gradientTo = 0xFFFF4500.toInt(),
+                gradientTo = 0xFF3B0764.toInt(),
                 quietZone = 3,
-                dotScale = 0.90f,
+                dotScale = 0.92f,
                 ecc = "H",
                 artDirection = "art-tropical-sunset"
             ),
@@ -714,26 +780,1260 @@ object QrPresets {
             featured = true
         ),
 
-        // --- BOTANICAL ART CATEGORY ---
         QrPreset(
-            id = "pro-wisteria",
-            name = "Wisteria Violet Glow",
-            category = "Botanical Art",
-            description = "Bioluminescent purple wisteria vines with zero-interference dark void",
+            id = "art-aurora-night",
+            name = "Aurora Night Sky",
+            category = "🌟 Iconic Art Frames",
+            description = "Bioluminescent arctic aurora curtains dancing over obsidian waters",
+            style = QrStyle(
+                moduleShape = ModuleShape.Squircle,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFF00FFCC.toInt(),
+                bgColor = 0xFF030712.toInt(),
+                eyeColor = 0xFF00FFCC.toInt(),
+                ballColor = 0xFF8B5CF6.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF9933FF.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-aurora-night"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-aztec-sun",
+            name = "Aztec Sun Gold",
+            category = "🌟 Iconic Art Frames",
+            description = "Ancient Aztec radiant gold sun emblem on deep obsidian amber",
+            style = QrStyle(
+                moduleShape = ModuleShape.Diamond,
+                eyeShape = EyeShape.Diamond,
+                ballShape = EyeShape.Diamond,
+                fgColor = 0xFFFFD700.toInt(),
+                bgColor = 0xFF120802.toInt(),
+                eyeColor = 0xFFFFB300.toInt(),
+                ballColor = 0xFFFFE082.toInt(),
+                gradientType = GradientType.Radial,
+                gradientTo = 0xFFFF9800.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-aztec-sun"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-coral-bloom",
+            name = "Coral Floral Bloom",
+            category = "🌟 Iconic Art Frames",
+            description = "Vibrant coral botanical burst and delicate petals on velvety noir",
+            style = QrStyle(
+                moduleShape = ModuleShape.Leaf,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFFFF6F61.toInt(),
+                bgColor = 0xFF1A0A0E.toInt(),
+                eyeColor = 0xFFFF5252.toInt(),
+                ballColor = 0xFFFF8A80.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFFF9E80.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-coral-bloom"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-coral-reef",
+            name = "Deep Coral Reef",
+            category = "🌟 Iconic Art Frames",
+            description = "Submerged oceanic marine reef with bioluminescent cyan & aquamarine",
+            style = QrStyle(
+                moduleShape = ModuleShape.Bubbles,
+                eyeShape = EyeShape.Circle,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFF00E5FF.toInt(),
+                bgColor = 0xFF011627.toInt(),
+                eyeColor = 0xFF00E5FF.toInt(),
+                ballColor = 0xFF1DE9B6.toInt(),
+                gradientType = GradientType.Linear,
+                gradientTo = 0xFF00B0FF.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-coral-reef"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-cosmic-nebula",
+            name = "Cosmic Stellar Nebula",
+            category = "🌟 Iconic Art Frames",
+            description = "Interstellar ultraviolet nebula clouds and celestial starlight vortex",
+            style = QrStyle(
+                moduleShape = ModuleShape.Dots,
+                eyeShape = EyeShape.Circle,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFFE040FB.toInt(),
+                bgColor = 0xFF0B001A.toInt(),
+                eyeColor = 0xFF00E5FF.toInt(),
+                ballColor = 0xFFE040FB.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF7C4DFF.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-cosmic-nebula"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-crystal-ice",
+            name = "Crystal Glacial Ice",
+            category = "🌟 Iconic Art Frames",
+            description = "Frozen crystalline prism facets and shimmering arctic glacial geometry",
+            style = QrStyle(
+                moduleShape = ModuleShape.Square,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFFE0F7FA.toInt(),
+                bgColor = 0xFF04101A.toInt(),
+                eyeColor = 0xFF00E5FF.toInt(),
+                ballColor = 0xFFB2EBF2.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF80DEEA.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-crystal-ice"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-deco-gold",
+            name = "Art Deco Gold Filigree",
+            category = "🌟 Iconic Art Frames",
+            description = "Opulent Roaring Twenties Gatsby gold geometric filigree on black onyx",
+            style = QrStyle(
+                moduleShape = ModuleShape.Classy,
+                eyeShape = EyeShape.Classy,
+                ballShape = EyeShape.Classy,
+                fgColor = 0xFFFFD700.toInt(),
+                bgColor = 0xFF0B0907.toInt(),
+                eyeColor = 0xFFFFD700.toInt(),
+                ballColor = 0xFFFFF8E1.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFD4AF37.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-deco-gold"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-ember-roses",
+            name = "Ember Rose Petals",
+            category = "🌟 Iconic Art Frames",
+            description = "Glowing crimson and molten amber rose vines with drifting sparks",
+            style = QrStyle(
+                moduleShape = ModuleShape.Leaf,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFFFF5722.toInt(),
+                bgColor = 0xFF100305.toInt(),
+                eyeColor = 0xFFFF1744.toInt(),
+                ballColor = 0xFFFFAB40.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFE91E63.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-ember-roses"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-enchanted-forest",
+            name = "Enchanted Woodland Forest",
+            category = "🌟 Iconic Art Frames",
+            description = "Mystical emerald rainforest canopy with glowing jade moss and orchids",
+            style = QrStyle(
+                moduleShape = ModuleShape.Leaf,
+                eyeShape = EyeShape.Leaf,
+                ballShape = EyeShape.Leaf,
+                fgColor = 0xFF10B981.toInt(),
+                bgColor = 0xFF02130A.toInt(),
+                eyeColor = 0xFF34D399.toInt(),
+                ballColor = 0xFF6EE7B7.toInt(),
+                gradientType = GradientType.Linear,
+                gradientTo = 0xFF059669.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-enchanted-forest"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-festival-lights",
+            name = "Festival Lantern Bokeh",
+            category = "🌟 Iconic Art Frames",
+            description = "Festive golden festival lantern bokeh and warm celebratory glow",
+            style = QrStyle(
+                moduleShape = ModuleShape.Dots,
+                eyeShape = EyeShape.Circle,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFFFFCA28.toInt(),
+                bgColor = 0xFF120A04.toInt(),
+                eyeColor = 0xFFFFB300.toInt(),
+                ballColor = 0xFFFFE082.toInt(),
+                gradientType = GradientType.Radial,
+                gradientTo = 0xFFFF7043.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-festival-lights"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-frost-blue",
+            name = "Glacial Frost Blue",
+            category = "🌟 Iconic Art Frames",
+            description = "Deep sapphire ice crystals and glacial frost overlay on midnight blue",
+            style = QrStyle(
+                moduleShape = ModuleShape.Rounded,
+                eyeShape = EyeShape.Circle,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFF38BDF8.toInt(),
+                bgColor = 0xFF030D1A.toInt(),
+                eyeColor = 0xFF38BDF8.toInt(),
+                ballColor = 0xFFBAE6FD.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF0284C7.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-frost-blue"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-golden-lotus",
+            name = "Sacred Golden Lotus",
+            category = "🌟 Iconic Art Frames",
+            description = "Spiritual blooming golden lotus with celestial aura on obsidian water",
+            style = QrStyle(
+                moduleShape = ModuleShape.Leaf,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFFFFD700.toInt(),
+                bgColor = 0xFF0A0802.toInt(),
+                eyeColor = 0xFFFFC107.toInt(),
+                ballColor = 0xFFFFE082.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFF59E0B.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-golden-lotus"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-golden-roses",
+            name = "Golden Rose Luxury",
+            category = "🌟 Iconic Art Frames",
+            description = "Luxurious metallic champagne gold roses with ornate botanical flourishes",
+            style = QrStyle(
+                moduleShape = ModuleShape.Classy,
+                eyeShape = EyeShape.Classy,
+                ballShape = EyeShape.Classy,
+                fgColor = 0xFFFFD54F.toInt(),
+                bgColor = 0xFF140D05.toInt(),
+                eyeColor = 0xFFFFC107.toInt(),
+                ballColor = 0xFFFFECB3.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFFFB74D.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-golden-roses"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-great-wave",
+            name = "Ukiyo-e Great Wave",
+            category = "🌟 Iconic Art Frames",
+            description = "Classic woodblock ocean tsunami with foam crests on washi paper",
+            style = QrStyle(
+                moduleShape = ModuleShape.Fluid,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFF1E3A8A.toInt(),
+                bgColor = 0xFFFAF7F2.toInt(),
+                eyeColor = 0xFF0C4A6E.toInt(),
+                ballColor = 0xFF38BDF8.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF0284C7.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-great-wave"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-groovy-70s",
+            name = "Groovy 70s Waves",
+            category = "🌟 Iconic Art Frames",
+            description = "Psychedelic 1970s retro curves in sunset orange, mustard, and avocado",
+            style = QrStyle(
+                moduleShape = ModuleShape.Rounded,
+                eyeShape = EyeShape.Circle,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFFEA580C.toInt(),
+                bgColor = 0xFFFFFBEB.toInt(),
+                eyeColor = 0xFFC2410C.toInt(),
+                ballColor = 0xFFD97706.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFCA8A04.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-groovy-70s"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-holo-chrome",
+            name = "Holo Chrome Mercury",
+            category = "🌟 Iconic Art Frames",
+            description = "Liquid mercury reflection with iridescent holographic chromatic luster",
+            style = QrStyle(
+                moduleShape = ModuleShape.Squircle,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFFE2E8F0.toInt(),
+                bgColor = 0xFF0F172A.toInt(),
+                eyeColor = 0xFF38BDF8.toInt(),
+                ballColor = 0xFFC084FC.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF94A3B8.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-holo-chrome"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-kawaii-sweets",
+            name = "Kawaii Pastel Sweets",
+            category = "🌟 Iconic Art Frames",
+            description = "Playful pastel cotton candy and sugar confections on soft blush",
+            style = QrStyle(
+                moduleShape = ModuleShape.Bubbles,
+                eyeShape = EyeShape.Circle,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFFF472B6.toInt(),
+                bgColor = 0xFFFFF1F2.toInt(),
+                eyeColor = 0xFFEC4899.toInt(),
+                ballColor = 0xFF3B82F6.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF60A5FA.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-kawaii-sweets"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-marble-gold",
+            name = "Carrara Marble Gold",
+            category = "🌟 Iconic Art Frames",
+            description = "Polished Italian white marble with rich molten gold veining",
+            style = QrStyle(
+                moduleShape = ModuleShape.Classy,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFF1E293B.toInt(),
+                bgColor = 0xFFFAF9F6.toInt(),
+                eyeColor = 0xFFB45309.toInt(),
+                ballColor = 0xFFD97706.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF334155.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-marble-gold"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-mosaic-lapis",
+            name = "Lapis Lazuli Mosaic",
+            category = "🌟 Iconic Art Frames",
+            description = "Byzantine royal lapis lazuli mosaic tiles with golden tesserae",
+            style = QrStyle(
+                moduleShape = ModuleShape.Square,
+                eyeShape = EyeShape.Square,
+                ballShape = EyeShape.Square,
+                fgColor = 0xFF1D4ED8.toInt(),
+                bgColor = 0xFF0A1026.toInt(),
+                eyeColor = 0xFFF59E0B.toInt(),
+                ballColor = 0xFF60A5FA.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF1E40AF.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-mosaic-lapis"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-neon-grid",
+            name = "Retro Neon Gridwave",
+            category = "🌟 Iconic Art Frames",
+            description = "Cyberpunk outrun neon cyan and synthwave magenta wireframe horizon",
+            style = QrStyle(
+                moduleShape = ModuleShape.Squircle,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFF00F0FF.toInt(),
+                bgColor = 0xFF080014.toInt(),
+                eyeColor = 0xFF00F0FF.toInt(),
+                ballColor = 0xFFFF007F.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFFF007F.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-neon-grid"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-phoenix-fire",
+            name = "Phoenix Solar Fire",
+            category = "🌟 Iconic Art Frames",
+            description = "Majestic blazing phoenix wings with fiery solar plumage on obsidian",
+            style = QrStyle(
+                moduleShape = ModuleShape.Leaf,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFFFF3D00.toInt(),
+                bgColor = 0xFF120300.toInt(),
+                eyeColor = 0xFFFF1744.toInt(),
+                ballColor = 0xFFFF9100.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFFFD600.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-phoenix-fire"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-pixel-voxel",
+            name = "3D Pixel Voxel Matrix",
+            category = "🌟 Iconic Art Frames",
+            description = "Isometric 8-bit voxel cube blocks in vibrant neon emerald and cyan",
+            style = QrStyle(
+                moduleShape = ModuleShape.Square,
+                eyeShape = EyeShape.Square,
+                ballShape = EyeShape.Square,
+                fgColor = 0xFF10B981.toInt(),
+                bgColor = 0xFF090D16.toInt(),
+                eyeColor = 0xFFF59E0B.toInt(),
+                ballColor = 0xFF10B981.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF06B6D4.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-pixel-voxel"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-sakura-night",
+            name = "Midnight Sakura Blossom",
+            category = "🌟 Iconic Art Frames",
+            description = "Cherry blossom petals drifting under starry moonlit indigo sky",
+            style = QrStyle(
+                moduleShape = ModuleShape.Leaf,
+                eyeShape = EyeShape.Leaf,
+                ballShape = EyeShape.Leaf,
+                fgColor = 0xFFF472B6.toInt(),
+                bgColor = 0xFF0F071A.toInt(),
+                eyeColor = 0xFFF43F5E.toInt(),
+                ballColor = 0xFFE879F9.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFC084FC.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-sakura-night"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-silver-frost",
+            name = "Platinum Silver Frost",
+            category = "🌟 Iconic Art Frames",
+            description = "Delicate metallic platinum filigree and sparkling silver frost",
+            style = QrStyle(
+                moduleShape = ModuleShape.Classy,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFFE2E8F0.toInt(),
+                bgColor = 0xFF0B0F14.toInt(),
+                eyeColor = 0xFF94A3B8.toInt(),
+                ballColor = 0xFFF8FAFC.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFCBD5E1.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-silver-frost"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-stained-glass",
+            name = "Gothic Cathedral Glass",
+            category = "🌟 Iconic Art Frames",
+            description = "Sacred cathedral leaded stained glass with ruby, amber, and cobalt light",
+            style = QrStyle(
+                moduleShape = ModuleShape.Square,
+                eyeShape = EyeShape.Square,
+                ballShape = EyeShape.Square,
+                fgColor = 0xFFDC2626.toInt(),
+                bgColor = 0xFF080812.toInt(),
+                eyeColor = 0xFFF59E0B.toInt(),
+                ballColor = 0xFF9333EA.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF2563EB.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-stained-glass"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-steampunk",
+            name = "Brass Horology Steampunk",
+            category = "🌟 Iconic Art Frames",
+            description = "Victorian brass cogs, copper gears, and riveted clockwork mechanisms",
+            style = QrStyle(
+                moduleShape = ModuleShape.Squircle,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFFD97706.toInt(),
+                bgColor = 0xFF150D06.toInt(),
+                eyeColor = 0xFFF59E0B.toInt(),
+                ballColor = 0xFF92400E.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFB45309.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-steampunk"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-vintage-glam",
+            name = "Vintage Hollywood Glamour",
+            category = "🌟 Iconic Art Frames",
+            description = "Golden age Hollywood luxury with ornate baroque flourishes on champagne",
+            style = QrStyle(
+                moduleShape = ModuleShape.Classy,
+                eyeShape = EyeShape.Classy,
+                ballShape = EyeShape.Classy,
+                fgColor = 0xFFFFD700.toInt(),
+                bgColor = 0xFF0D0A08.toInt(),
+                eyeColor = 0xFFFFE082.toInt(),
+                ballColor = 0xFFFFD54F.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFF59E0B.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-vintage-glam"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-violet-stars",
+            name = "Violet Celestial Stardust",
+            category = "🌟 Iconic Art Frames",
+            description = "Deep violet cosmic galaxy with sparkling diamond stardust cluster",
+            style = QrStyle(
+                moduleShape = ModuleShape.Dots,
+                eyeShape = EyeShape.Circle,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFFC084FC.toInt(),
+                bgColor = 0xFF0E041A.toInt(),
+                eyeColor = 0xFFE879F9.toInt(),
+                ballColor = 0xFFDDD6FE.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFA855F7.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-violet-stars"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-wisteria-glow",
+            name = "Luminescent Wisteria Arbour",
+            category = "🌟 Iconic Art Frames",
+            description = "Cascading lavender and periwinkle wisteria blooms with glowing tendrils",
+            style = QrStyle(
+                moduleShape = ModuleShape.Dots,
+                eyeShape = EyeShape.Circle,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFFD8B4FE.toInt(),
+                bgColor = 0xFF0C071C.toInt(),
+                eyeColor = 0xFFA78BFA.toInt(),
+                ballColor = 0xFFC4B5FD.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF818CF8.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-wisteria-glow"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-arabian-nights",
+            name = "Mystic Arabian Nights",
+            category = "🌟 Iconic Art Frames",
+            description = "Desert star-lit dunes beneath golden crescent moon and sapphire sky",
+            style = QrStyle(
+                moduleShape = ModuleShape.Classy,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFFF59E0B.toInt(),
+                bgColor = 0xFF080D21.toInt(),
+                eyeColor = 0xFF38BDF8.toInt(),
+                ballColor = 0xFFFBBF24.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFD97706.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-arabian-nights"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-autumn-harvest",
+            name = "Golden Autumn Harvest",
+            category = "🌟 Iconic Art Frames",
+            description = "Warm russet maple leaves, golden pumpkin amber, and harvest forest",
+            style = QrStyle(
+                moduleShape = ModuleShape.Leaf,
+                eyeShape = EyeShape.Leaf,
+                ballShape = EyeShape.Leaf,
+                fgColor = 0xFFEA580C.toInt(),
+                bgColor = 0xFF140702.toInt(),
+                eyeColor = 0xFFB45309.toInt(),
+                ballColor = 0xFFF97316.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFD97706.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-autumn-harvest"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-balloon-party",
+            name = "Celebration Balloon Confetti",
+            category = "🌟 Iconic Art Frames",
+            description = "Joyful multicolored festival celebration balloons and floating confetti",
+            style = QrStyle(
+                moduleShape = ModuleShape.Bubbles,
+                eyeShape = EyeShape.Circle,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFFEC4899.toInt(),
+                bgColor = 0xFFFAFAFA.toInt(),
+                eyeColor = 0xFF10B981.toInt(),
+                ballColor = 0xFFF59E0B.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF3B82F6.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-balloon-party"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-christmas-frost",
+            name = "Festive Holiday Frost",
+            category = "🌟 Iconic Art Frames",
+            description = "Holiday winter evergreen, frosted cranberries, and sparkling snowfall",
             style = QrStyle(
                 moduleShape = ModuleShape.Rounded,
                 eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Rounded,
+                fgColor = 0xFFEF4444.toInt(),
+                bgColor = 0xFF02140D.toInt(),
+                eyeColor = 0xFFEF4444.toInt(),
+                ballColor = 0xFFFBBF24.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF10B981.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-christmas-frost"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-cocoa-cafe",
+            name = "Artisan Cocoa Cafe",
+            category = "🌟 Iconic Art Frames",
+            description = "Cozy roasted coffee beans, warm cocoa, and creamy espresso froth",
+            style = QrStyle(
+                moduleShape = ModuleShape.Rounded,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Rounded,
+                fgColor = 0xFF78350F.toInt(),
+                bgColor = 0xFFFFFBEB.toInt(),
+                eyeColor = 0xFF92400E.toInt(),
+                ballColor = 0xFFB45309.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF451A03.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-cocoa-cafe"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-dino-world",
+            name = "Jurassic Prehistoric World",
+            category = "🌟 Iconic Art Frames",
+            description = "Prehistoric Jurassic jungle canopy with ancient amber and fossils",
+            style = QrStyle(
+                moduleShape = ModuleShape.Squircle,
+                eyeShape = EyeShape.Rounded,
                 ballShape = EyeShape.Circle,
-                fgColor = 0xFF38BDF8.toInt(),
-                bgColor = 0xFF0B0C10.toInt(),
-                eyeColor = 0xFFC084FC.toInt(),
+                fgColor = 0xFF15803D.toInt(),
+                bgColor = 0xFF061408.toInt(),
+                eyeColor = 0xFF16A34A.toInt(),
                 ballColor = 0xFFF59E0B.toInt(),
                 gradientType = GradientType.Diagonal,
-                gradientTo = 0xFFA855F7.toInt(),
+                gradientTo = 0xFFD97706.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-dino-world"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-fireworks-night",
+            name = "Midnight Sky Fireworks",
+            category = "🌟 Iconic Art Frames",
+            description = "Radiant pyrotechnic bursts of turquoise, crimson, and golden sparks",
+            style = QrStyle(
+                moduleShape = ModuleShape.Dots,
+                eyeShape = EyeShape.Circle,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFFFF0055.toInt(),
+                bgColor = 0xFF050510.toInt(),
+                eyeColor = 0xFF00F0FF.toInt(),
+                ballColor = 0xFFFF0055.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFFFD700.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-fireworks-night"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-halloween-night",
+            name = "Haunted Halloween Night",
+            category = "🌟 Iconic Art Frames",
+            description = "Spooky jack-o-lantern glowing orange with haunted purple mist",
+            style = QrStyle(
+                moduleShape = ModuleShape.Squircle,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFFFF7700.toInt(),
+                bgColor = 0xFF0B0410.toInt(),
+                eyeColor = 0xFFFF5500.toInt(),
+                ballColor = 0xFFA855F7.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF9333EA.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-halloween-night"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-moonlit-zodiac",
+            name = "Celestial Moonlit Zodiac",
+            category = "🌟 Iconic Art Frames",
+            description = "Mystical zodiac constellation map with silver star charts and moon",
+            style = QrStyle(
+                moduleShape = ModuleShape.Dots,
+                eyeShape = EyeShape.Circle,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFFE0E7FF.toInt(),
+                bgColor = 0xFF03071E.toInt(),
+                eyeColor = 0xFF6366F1.toInt(),
+                ballColor = 0xFFC7D2FE.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF818CF8.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-moonlit-zodiac"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-music-groove",
+            name = "Rhythmic Music Groove",
+            category = "🌟 Iconic Art Frames",
+            description = "Neon soundwaves and rhythmic vinyl audio grooves with pulsing beats",
+            style = QrStyle(
+                moduleShape = ModuleShape.Rounded,
+                eyeShape = EyeShape.Circle,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFF06B6D4.toInt(),
+                bgColor = 0xFF0A0A14.toInt(),
+                eyeColor = 0xFFEC4899.toInt(),
+                ballColor = 0xFF06B6D4.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF8B5CF6.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-music-groove"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-nautical-bay",
+            name = "Maritime Harbor Bay",
+            category = "🌟 Iconic Art Frames",
+            description = "Crisp ocean harbor breeze with navy anchor and brass nautical accents",
+            style = QrStyle(
+                moduleShape = ModuleShape.Rounded,
+                eyeShape = EyeShape.Circle,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFF0369A1.toInt(),
+                bgColor = 0xFFF0F9FF.toInt(),
+                eyeColor = 0xFF075985.toInt(),
+                ballColor = 0xFFBAE6FD.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF0284C7.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-nautical-bay"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-pastel-dream",
+            name = "Pastel Cloudscape Dream",
+            category = "🌟 Iconic Art Frames",
+            description = "Dreamy iridescent pastel sky with soft lavender, mint, and blush clouds",
+            style = QrStyle(
+                moduleShape = ModuleShape.Bubbles,
+                eyeShape = EyeShape.Circle,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFF8B5CF6.toInt(),
+                bgColor = 0xFFFAF5FF.toInt(),
+                eyeColor = 0xFF6366F1.toInt(),
+                ballColor = 0xFFF472B6.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFEC4899.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-pastel-dream"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-rainy-april",
+            name = "Rainy Spring Blossom",
+            category = "🌟 Iconic Art Frames",
+            description = "Fresh spring raindrops falling on translucent umbrellas and teal puddles",
+            style = QrStyle(
+                moduleShape = ModuleShape.Rounded,
+                eyeShape = EyeShape.Circle,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFF0D9488.toInt(),
+                bgColor = 0xFFF0FDFA.toInt(),
+                eyeColor = 0xFF0F766E.toInt(),
+                ballColor = 0xFF2DD4BF.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF0284C7.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-rainy-april"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-royal-baroque",
+            name = "Versailles Royal Baroque",
+            category = "🌟 Iconic Art Frames",
+            description = "Opulent gold leaf cartouches on burgundy velvet palatial backdrop",
+            style = QrStyle(
+                moduleShape = ModuleShape.Classy,
+                eyeShape = EyeShape.Classy,
+                ballShape = EyeShape.Classy,
+                fgColor = 0xFFFFD700.toInt(),
+                bgColor = 0xFF1A050D.toInt(),
+                eyeColor = 0xFFE11D48.toInt(),
+                ballColor = 0xFFFFE082.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFF59E0B.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-royal-baroque"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-safari-savanna",
+            name = "Savanna Sunset Safari",
+            category = "🌟 Iconic Art Frames",
+            description = "Serengeti acacia silhouettes against radiant copper and amber sunset",
+            style = QrStyle(
+                moduleShape = ModuleShape.Rounded,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Rounded,
+                fgColor = 0xFFEA580C.toInt(),
+                bgColor = 0xFF170802.toInt(),
+                eyeColor = 0xFFD97706.toInt(),
+                ballColor = 0xFFF97316.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFB45309.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-safari-savanna"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-sumi-ink",
+            name = "Traditional Sumi-e Brush Ink",
+            category = "🌟 Iconic Art Frames",
+            description = "Expressive Japanese sumi-e ink washes and brushwork on fibrous washi",
+            style = QrStyle(
+                moduleShape = ModuleShape.Leaf,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFF0F172A.toInt(),
+                bgColor = 0xFFF5F3EF.toInt(),
+                eyeColor = 0xFF1E293B.toInt(),
+                ballColor = 0xFF475569.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF334155.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-sumi-ink"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-travel-wonders",
+            name = "Global Travel Explorer",
+            category = "🌟 Iconic Art Frames",
+            description = "Vintage world exploration atlas with nautical compass and parchment",
+            style = QrStyle(
+                moduleShape = ModuleShape.Rounded,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Rounded,
+                fgColor = 0xFF0F766E.toInt(),
+                bgColor = 0xFFFDFBF7.toInt(),
+                eyeColor = 0xFF047857.toInt(),
+                ballColor = 0xFFB45309.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFD97706.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-travel-wonders"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-tropical-paradise",
+            name = "Exotic Island Paradise",
+            category = "🌟 Iconic Art Frames",
+            description = "Tropical turquoise lagoon waters and vibrant pink hibiscus blossoms",
+            style = QrStyle(
+                moduleShape = ModuleShape.Rounded,
+                eyeShape = EyeShape.Circle,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFF06B6D4.toInt(),
+                bgColor = 0xFF02171A.toInt(),
+                eyeColor = 0xFF10B981.toInt(),
+                ballColor = 0xFFF43F5E.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFEC4899.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-tropical-paradise"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-wedding-rose",
+            name = "Romantic Wedding Rose Arch",
+            category = "🌟 Iconic Art Frames",
+            description = "Romantic bridal blush roses, ivory satin ribbons, and delicate greenery",
+            style = QrStyle(
+                moduleShape = ModuleShape.Leaf,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFFBE185D.toInt(),
+                bgColor = 0xFFFFF1F2.toInt(),
+                eyeColor = 0xFF9D174D.toInt(),
+                ballColor = 0xFFF472B6.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFDB2777.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-wedding-rose"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-zen-mandala",
+            name = "Sacred Zen Mandala",
+            category = "🌟 Iconic Art Frames",
+            description = "Serene spiritual mandala geometry with sacred lotus ring and indigo aura",
+            style = QrStyle(
+                moduleShape = ModuleShape.Dots,
+                eyeShape = EyeShape.Circle,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFF6366F1.toInt(),
+                bgColor = 0xFF090919.toInt(),
+                eyeColor = 0xFFA855F7.toInt(),
+                ballColor = 0xFF818CF8.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF8B5CF6.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-zen-mandala"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-iconic-ukiyo",
+            name = "Edo Woodblock Wave",
+            category = "🌟 Iconic Art Frames",
+            description = "Indigo ocean surf and foaming white sea spray on handmade washi",
+            style = QrStyle(
+                moduleShape = ModuleShape.Fluid,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFF0369A1.toInt(),
+                bgColor = 0xFFFDFBF7.toInt(),
+                eyeColor = 0xFF075985.toInt(),
+                ballColor = 0xFF38BDF8.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF0C4A6E.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-ukiyo"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-iconic-royal",
+            name = "Imperial Royal Sovereign",
+            category = "🌟 Iconic Art Frames",
+            description = "Imperial crown crest and baroque gold scrollwork on dark marble",
+            style = QrStyle(
+                moduleShape = ModuleShape.Classy,
+                eyeShape = EyeShape.Classy,
+                ballShape = EyeShape.Classy,
+                fgColor = 0xFFFFD700.toInt(),
+                bgColor = 0xFF0B0907.toInt(),
+                eyeColor = 0xFFFFD700.toInt(),
+                ballColor = 0xFFFFDF73.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFD4AF37.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-royal"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-iconic-sakura",
+            name = "Spring Sakura Bloom",
+            category = "🌟 Iconic Art Frames",
+            description = "Delicate pink cherry blossom petals falling against satin blush",
+            style = QrStyle(
+                moduleShape = ModuleShape.Leaf,
+                eyeShape = EyeShape.Leaf,
+                ballShape = EyeShape.Leaf,
+                fgColor = 0xFFE11D48.toInt(),
+                bgColor = 0xFFFFF5F7.toInt(),
+                eyeColor = 0xFFBE185D.toInt(),
+                ballColor = 0xFFFB7185.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFFF43F5E.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-sakura"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-iconic-matcha",
+            name = "Ceremonial Matcha Botanical",
+            category = "🌟 Iconic Art Frames",
+            description = "Vibrant ceremonial green tea leaves framing crisp emerald modules",
+            style = QrStyle(
+                moduleShape = ModuleShape.Leaf,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFF15803D.toInt(),
+                bgColor = 0xFFF7FEE7.toInt(),
+                eyeColor = 0xFF166534.toInt(),
+                ballColor = 0xFF4ADE80.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF16A34A.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-matcha"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-iconic-solarpunk",
+            name = "Solarpunk Amber Canopy",
+            category = "🌟 Iconic Art Frames",
+            description = "Lush solarpunk greenery with glowing golden amber solar motifs",
+            style = QrStyle(
+                moduleShape = ModuleShape.Squircle,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFFD97706.toInt(),
+                bgColor = 0xFF0B1A0E.toInt(),
+                eyeColor = 0xFF10B981.toInt(),
+                ballColor = 0xFFFBBF24.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF059669.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-solarpunk"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-iconic-neon-fungi",
+            name = "Neon Bioluminescent Fungi",
+            category = "🌟 Iconic Art Frames",
+            description = "Bioluminescent emerald and cyan fungal spores glowing on midnight",
+            style = QrStyle(
+                moduleShape = ModuleShape.Bubbles,
+                eyeShape = EyeShape.Circle,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFF10B981.toInt(),
+                bgColor = 0xFF02120C.toInt(),
+                eyeColor = 0xFF06B6D4.toInt(),
+                ballColor = 0xFF6EE7B7.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF06B6D4.toInt(),
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-neon-fungi"
+            ),
+            featured = true
+        ),
+        QrPreset(
+            id = "art-iconic-mono",
+            name = "Monochrome Luxe Precision",
+            category = "🌟 Iconic Art Frames",
+            description = "High-contrast architectural black and white luxury geometric styling",
+            style = QrStyle(
+                moduleShape = ModuleShape.Square,
+                eyeShape = EyeShape.Square,
+                ballShape = EyeShape.Square,
+                fgColor = 0xFF09090B.toInt(),
+                bgColor = 0xFFFAFAFA.toInt(),
+                eyeColor = 0xFF18181B.toInt(),
+                ballColor = 0xFF27272A.toInt(),
+                gradientType = GradientType.None,
+                quietZone = 3,
+                dotScale = 0.90f,
+                ecc = "H",
+                artDirection = "art-mono"
+            ),
+            featured = true
+        ),
+
+        // --- BOTANICAL ART CATEGORY ---
+        QrPreset(
+            id = "pro-wisteria",
+            name = "Bioluminescent Wisteria",
+            category = "Botanical Art",
+            description = "Bioluminescent electric cyan & neon mint glowing vines on pitch obsidian void",
+            style = QrStyle(
+                moduleShape = ModuleShape.Squircle,
+                eyeShape = EyeShape.Rounded,
+                ballShape = EyeShape.Circle,
+                fgColor = 0xFF00F0FF.toInt(),
+                bgColor = 0xFF020914.toInt(),
+                eyeColor = 0xFF00F0FF.toInt(),
+                ballColor = 0xFF00FF87.toInt(),
+                gradientType = GradientType.Diagonal,
+                gradientTo = 0xFF00FF87.toInt(),
                 quietZone = 1,
                 moduleGap = 0.02f,
                 dotScale = 0.90f,
                 ecc = "H",
+                effect = QrEffect.Glow,
+                effectIntensity = 1.35f,
                 artDirection = "bioluminescent-wisteria"
             ),
             featured = true
@@ -1100,19 +2400,19 @@ object QrPresets {
         ),
         QrPreset(
             id = "art-bioluminescent",
-            name = "Bioluminescent Wisteria",
-            category = "Art",
-            description = "Glow-in-the-dark wisteria botanical frame with zero-interference pitch obsidian void",
+            name = "Bioluminescent Lagoon",
+            category = "Creative Art",
+            description = "Deep ocean bioluminescent aqua algae and neon emerald sea coral on midnight abyss",
             style = QrStyle(
-                moduleShape = ModuleShape.Rounded,
+                moduleShape = ModuleShape.Fluid,
                 eyeShape = EyeShape.Rounded,
                 ballShape = EyeShape.Circle,
-                fgColor = 0xFF38BDF8.toInt(),
-                bgColor = 0xFF0B0C10.toInt(),
-                eyeColor = 0xFFC084FC.toInt(),
-                ballColor = 0xFFF59E0B.toInt(),
+                fgColor = 0xFF06B6D4.toInt(),
+                bgColor = 0xFF030C16.toInt(),
+                eyeColor = 0xFF38BDF8.toInt(),
+                ballColor = 0xFF10B981.toInt(),
                 gradientType = GradientType.Diagonal,
-                gradientTo = 0xFFA855F7.toInt(),
+                gradientTo = 0xFF10B981.toInt(),
                 quietZone = 1,
                 moduleGap = 0.02f,
                 dotScale = 0.90f,

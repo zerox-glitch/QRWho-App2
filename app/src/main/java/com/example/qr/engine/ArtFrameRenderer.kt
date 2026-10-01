@@ -47,6 +47,63 @@ object ArtFrameRenderer {
             "art-crystal-geode" -> renderAmethystGeode(canvas, s)
             "art-neon-noir" -> renderNeonNoir(canvas, s)
             "art-solar-flare" -> renderSolarFlare(canvas, s)
+            // 50 Primary Art Frames from Photo Art
+            "art-aurora-night" -> renderAuroraBorealis(canvas, s)
+            "art-aztec-sun" -> renderSolarFlare(canvas, s)
+            "art-coral-bloom" -> renderSakuraBlossom(canvas, s)
+            "art-coral-reef" -> renderOceanWaves(canvas, s)
+            "art-cosmic-nebula" -> renderCosmicGalaxy(canvas, s)
+            "art-crystal-ice" -> renderAmethystGeode(canvas, s)
+            "art-deco-gold" -> renderRoyalGold(canvas, s)
+            "art-ember-roses" -> renderFieryRose(canvas, s)
+            "art-enchanted-forest" -> renderJungleIvy(canvas, s)
+            "art-festival-lights" -> renderNeonRing(canvas, s)
+            "art-frost-blue" -> renderAmethystGeode(canvas, s)
+            "art-golden-lotus" -> renderMidnightLotus(canvas, s)
+            "art-golden-roses" -> renderRoyalGold(canvas, s)
+            "art-great-wave" -> renderOceanWaves(canvas, s)
+            "art-groovy-70s" -> renderMemphisPop(canvas, s)
+            "art-holo-chrome" -> renderHoloPrism(canvas, s)
+            "art-kawaii-sweets" -> render3dBubbles(canvas, s)
+            "art-marble-gold" -> renderGoldenKintsugi(canvas, s)
+            "art-mosaic-lapis" -> renderRoyalGold(canvas, s)
+            "art-neon-grid" -> renderCyberpunk(canvas, s)
+            "art-phoenix-fire" -> renderSolarFlare(canvas, s)
+            "art-pixel-voxel" -> renderNeonVoxels(canvas, s)
+            "art-sakura-night" -> renderSakuraBlossom(canvas, s)
+            "art-silver-frost" -> renderClockworkChrono(canvas, s)
+            "art-stained-glass" -> renderRoyalGold(canvas, s)
+            "art-steampunk" -> renderClockworkChrono(canvas, s)
+            "art-vintage-glam" -> renderRoyalGold(canvas, s)
+            "art-violet-stars" -> renderCosmicGalaxy(canvas, s)
+            "art-wisteria-glow" -> renderPurpleWisteria(canvas, s)
+            "art-arabian-nights" -> renderCosmicGalaxy(canvas, s)
+            "art-autumn-harvest" -> renderFieryRose(canvas, s)
+            "art-balloon-party" -> render3dBubbles(canvas, s)
+            "art-christmas-frost" -> renderAmethystGeode(canvas, s)
+            "art-cocoa-cafe" -> renderClockworkChrono(canvas, s)
+            "art-dino-world" -> renderJungleIvy(canvas, s)
+            "art-fireworks-night" -> renderNeonRing(canvas, s)
+            "art-halloween-night" -> renderFieryRose(canvas, s)
+            "art-moonlit-zodiac" -> renderCosmicGalaxy(canvas, s)
+            "art-music-groove" -> renderCyberpunk(canvas, s)
+            "art-nautical-bay" -> renderOceanWaves(canvas, s)
+            "art-pastel-dream" -> render3dBubbles(canvas, s)
+            "art-rainy-april" -> renderNeonNoir(canvas, s)
+            "art-royal-baroque" -> renderRoyalGold(canvas, s)
+            "art-safari-savanna" -> renderParadisePalm(canvas, s)
+            "art-sumi-ink" -> renderGoldenKintsugi(canvas, s)
+            "art-travel-wonders" -> renderParadisePalm(canvas, s)
+            "art-tropical-paradise" -> renderParadisePalm(canvas, s)
+            "art-wedding-rose" -> renderSakuraBlossom(canvas, s)
+            "art-zen-mandala" -> renderGoldenKintsugi(canvas, s)
+            "art-ukiyo" -> renderOceanWaves(canvas, s)
+            "art-royal" -> renderRoyalGold(canvas, s)
+            "art-sakura" -> renderSakuraBlossom(canvas, s)
+            "art-matcha" -> renderEmeraldFern(canvas, s)
+            "art-solarpunk" -> renderEmeraldFern(canvas, s)
+            "art-neon-fungi" -> renderOceanWaves(canvas, s)
+            "art-mono" -> renderAmethystGeode(canvas, s)
             else -> renderRoyalGold(canvas, s)
         }
     }
@@ -502,24 +559,62 @@ object ArtFrameRenderer {
     }
 
     private fun renderPurpleWisteria(canvas: Canvas, s: Float) {
-        // Midnight twilight indigo
-        canvas.drawColor(0xFF0B061A.toInt())
+        // Midnight velvet indigo background
+        canvas.drawColor(0xFF0D061A.toInt())
 
-        val vinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFFA855F7.toInt()
+        // Royal Gold outer filigree border
+        val goldBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xFFFFD700.toInt()
             style = Paint.Style.STROKE
-            strokeWidth = s * 0.005f
+            strokeWidth = s * 0.008f
         }
-        canvas.drawRoundRect(RectF(s * 0.035f, s * 0.035f, s * 0.965f, s * 0.965f), s * 0.04f, s * 0.04f, vinePaint)
+        canvas.drawRoundRect(RectF(s * 0.025f, s * 0.025f, s * 0.975f, s * 0.975f), s * 0.04f, s * 0.04f, goldBorder)
 
-        // Hanging Wisteria blossoms along top
-        val blossomPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFC084FC.toInt() }
-        for (i in 0..12) {
-            val wx = s * (0.08f + i * 0.07f)
-            val dropLen = if (i % 2 == 0) s * 0.08f else s * 0.05f
-            for (step in 1..4) {
-                canvas.drawCircle(wx, s * 0.04f + dropLen * (step / 4f), s * 0.008f, blossomPaint)
+        // Inner Amethyst vine border
+        val vinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xFF9333EA.toInt()
+            style = Paint.Style.STROKE
+            strokeWidth = s * 0.004f
+        }
+        canvas.drawRoundRect(RectF(s * 0.040f, s * 0.040f, s * 0.960f, s * 0.960f), s * 0.03f, s * 0.03f, vinePaint)
+
+        // Hanging Wisteria floral cascades along top arbour
+        val lavenderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFE879F9.toInt() }
+        val violetPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFC084FC.toInt() }
+        val deepPurplePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFA855F7.toInt() }
+
+        for (i in 0..16) {
+            val wx = s * (0.06f + i * 0.055f)
+            val dropSteps = when (i % 5) {
+                0 -> 8
+                1 -> 5
+                2 -> 7
+                3 -> 4
+                else -> 6
             }
+            for (step in 1..dropSteps) {
+                val wy = s * 0.035f + step * (s * 0.015f)
+                val r = s * (0.011f - step * 0.0008f).coerceAtLeast(0.004f)
+                val paint = when (step % 3) {
+                    0 -> lavenderPaint
+                    1 -> violetPaint
+                    else -> deepPurplePaint
+                }
+                canvas.drawCircle(wx, wy, r, paint)
+                // Secondary offset bloom for realistic cluster density
+                canvas.drawCircle(wx + r * 0.6f, wy + r * 0.4f, r * 0.7f, paint)
+            }
+        }
+
+        // Shimmering Golden Stardust Spores
+        val goldSpore = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFDE047.toInt() }
+        val sporeCoords = listOf(
+            Pair(0.12f, 0.18f), Pair(0.28f, 0.22f), Pair(0.45f, 0.16f),
+            Pair(0.62f, 0.20f), Pair(0.78f, 0.17f), Pair(0.90f, 0.24f),
+            Pair(0.08f, 0.88f), Pair(0.92f, 0.88f)
+        )
+        for ((sx, sy) in sporeCoords) {
+            canvas.drawCircle(s * sx, s * sy, s * 0.004f, goldSpore)
         }
     }
 

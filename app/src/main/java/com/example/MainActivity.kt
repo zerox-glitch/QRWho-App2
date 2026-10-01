@@ -47,6 +47,7 @@ import com.example.ui.StudioViewModel
 import com.example.ui.screens.HistoryScreen
 import com.example.ui.screens.LandingScreen
 import com.example.ui.screens.ScannerScreen
+import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.ShowcaseScreen
 import com.example.ui.screens.SplashScreen
 import com.example.ui.screens.StudioScreen
@@ -69,6 +70,7 @@ class MainActivity : ComponentActivity() {
                 val hasSeenWelcome = remember { prefs.getBoolean("has_seen_welcome_v1", false) }
                 var showSplashScreen by remember { androidx.compose.runtime.mutableStateOf(true) }
                 var showWelcomeScreen by remember { androidx.compose.runtime.mutableStateOf(!hasSeenWelcome) }
+                var showSettingsScreen by remember { androidx.compose.runtime.mutableStateOf(false) }
 
                 val viewModel: StudioViewModel = viewModel()
                 val snackbarHostState = remember { SnackbarHostState() }
@@ -124,6 +126,10 @@ class MainActivity : ComponentActivity() {
                             showWelcomeScreen = false
                             currentNavDestination = 1
                         }
+                    )
+                } else if (showSettingsScreen) {
+                    SettingsScreen(
+                        onNavigateBack = { showSettingsScreen = false }
                     )
                 } else {
                     Scaffold(
@@ -302,6 +308,7 @@ class MainActivity : ComponentActivity() {
                             onNavigateToHistory = { currentNavDestination = 3 },
                             onNavigateToShowcase = { currentNavDestination = 4 },
                             onOpenWelcome = { showWelcomeScreen = true },
+                            onOpenSettings = { showSettingsScreen = true },
                             modifier = Modifier.padding(innerPadding)
                         )
                         1 -> StudioScreen(
@@ -319,6 +326,7 @@ class MainActivity : ComponentActivity() {
                             viewModel = viewModel,
                             onNavigateToStudio = { currentNavDestination = 1 },
                             onNavigateToScanner = { currentNavDestination = 2 },
+                            onOpenSettings = { showSettingsScreen = true },
                             modifier = Modifier.padding(innerPadding)
                         )
                         4 -> ShowcaseScreen(

@@ -28,7 +28,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ContactPage
@@ -38,10 +40,12 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.RestaurantMenu
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Tune
@@ -65,6 +69,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -110,12 +115,14 @@ fun LandingScreen(
     onNavigateToHistory: (() -> Unit)? = null,
     onNavigateToShowcase: (() -> Unit)? = null,
     onOpenWelcome: (() -> Unit)? = null,
+    onOpenSettings: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val favoriteIds by viewModel.favoriteIds.collectAsStateWithLifecycle()
     val historyList by viewModel.historyList.collectAsStateWithLifecycle()
     val customPresets by viewModel.customPresets.collectAsStateWithLifecycle()
+    var showGuideModal by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -129,62 +136,135 @@ fun LandingScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 8.dp),
+                .padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(end = 8.dp)
-                    .clickable { onOpenWelcome?.invoke() },
+                    .weight(1f, fill = false)
+                    .clickable { onOpenWelcome?.invoke() }
+                    .padding(end = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.qrwho_logo),
                     contentDescription = "QRWho Logo",
                     modifier = Modifier
-                        .size(55.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .size(34.dp)
+                        .clip(RoundedCornerShape(8.dp))
                 )
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(6.dp))
                 Column {
                     Text(
                         text = "QRWho",
                         color = TextPrimary,
-                        fontSize = 19.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontStyle = FontStyle.Italic
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontStyle = FontStyle.Italic,
+                        maxLines = 1,
+                        softWrap = false
                     )
                     com.example.ui.components.RotatingTagline(
                         prefix = "QR that ",
                         words = listOf("scans", "pops", "shines", "converts", "inspires"),
-                        fontSize = 10.sp
+                        fontSize = 8.5.sp
                     )
                 }
             }
 
-            Button(
-                onClick = {
-                    try {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/qrwho"))
-                        context.startActivity(intent)
-                    } catch (e: Exception) {}
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFF5E5B),
-                    contentColor = Color.White
-                ),
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.testTag("landing_top_kofi_button")
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.LocalCafe,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Support ☕", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                // 1. Guide Button
+                Surface(
+                    modifier = Modifier
+                        .height(30.dp)
+                        .clip(RoundedCornerShape(15.dp))
+                        .border(1.dp, ElectricCyan.copy(alpha = 0.5f), RoundedCornerShape(15.dp))
+                        .clickable { showGuideModal = true }
+                        .testTag("landing_top_guide_button"),
+                    color = SurfaceDark
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AutoStories,
+                            contentDescription = "Guide",
+                            tint = ElectricCyan,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = "Guide",
+                            color = ElectricCyan,
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                }
+
+                // 2. Settings Button
+                Surface(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .border(1.dp, CardBorder, CircleShape)
+                        .clickable { onOpenSettings?.invoke() }
+                        .testTag("landing_settings_button"),
+                    color = SurfaceDark
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+
+                // 3. Support Button
+                Surface(
+                    modifier = Modifier
+                        .height(30.dp)
+                        .clip(RoundedCornerShape(15.dp))
+                        .border(1.dp, Color(0xFFFF8A88), RoundedCornerShape(15.dp))
+                        .clickable {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/qrwho"))
+                                context.startActivity(intent)
+                            } catch (_: Exception) {}
+                        }
+                        .testTag("landing_top_kofi_button"),
+                    color = Color(0xFFFF5E5B)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocalCafe,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = "Support",
+                            color = Color.White,
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                }
             }
         }
 
@@ -347,6 +427,151 @@ fun LandingScreen(
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Official Website Link Banner
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(ElectricCyan.copy(alpha = 0.08f))
+                        .border(1.dp, ElectricCyan.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+                        .clickable {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://qrwho.online"))
+                                context.startActivity(intent)
+                            } catch (_: Exception) {}
+                        }
+                        .testTag("hero_website_link_button"),
+                    color = Color.Transparent
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(ElectricCyan.copy(alpha = 0.18f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Language,
+                                    contentDescription = "Website",
+                                    tint = ElectricCyan,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Also available on Web",
+                                    color = TextSecondary,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = "qrwho.online",
+                                    color = ElectricCyan,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Open Site",
+                                color = ElectricCyan,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                                contentDescription = null,
+                                tint = ElectricCyan,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Interactive Master Guide & Scannability Rules Banner
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(NeonViolet.copy(alpha = 0.09f))
+                        .border(1.dp, NeonViolet.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+                        .clickable { showGuideModal = true }
+                        .testTag("hero_guide_card_button"),
+                    color = Color.Transparent
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f).padding(end = 8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(CircleShape)
+                                    .background(NeonViolet.copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AutoStories,
+                                    contentDescription = "Guide",
+                                    tint = NeonViolet,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "QRWho Guide & Scannability Rules",
+                                    color = TextPrimary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Learn all features & tips to make 100% scannable art",
+                                    color = TextSecondary,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Read",
+                                color = NeonViolet,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                tint = NeonViolet,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -439,7 +664,7 @@ fun LandingScreen(
                             }
                             Spacer(modifier = Modifier.width(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("✨ My Presets Library", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text("My Presets Library", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text("Personal Database of Custom Styles", color = EmeraldGreen, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
@@ -496,8 +721,8 @@ fun LandingScreen(
                             }
                             Spacer(modifier = Modifier.width(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("★ Preset Favorites", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text("Fast Access to 335+ Curated Styles", color = Color(0xFFFFB800), fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text("Preset Favorites", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text("Fast Access to 400+ Curated Styles", color = Color(0xFFFFB800), fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
 
@@ -519,7 +744,7 @@ fun LandingScreen(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Star any design in the Presets tab or Showcase. Your favorited styles instantly sync to dedicated '★ Favorites' filter chips.",
+                        text = "Star any design in the Presets tab or Showcase. Your favorited styles instantly sync to dedicated 'Favorites' filter chips.",
                         color = TextSecondary,
                         fontSize = 11.sp,
                         lineHeight = 16.sp
@@ -557,7 +782,7 @@ fun LandingScreen(
                             }
                             Spacer(modifier = Modifier.width(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("📐 Pro Export Suite", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text("Pro Export Suite", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text("512px–4096px Ultra HD & Vector SVG", color = ElectricCyan, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
@@ -611,7 +836,7 @@ fun LandingScreen(
                             }
                             Spacer(modifier = Modifier.width(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("🕒 Smart History & Vault", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text("Smart History & Vault", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text("${historyList.size} codes saved on device", color = TextMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
@@ -660,7 +885,7 @@ fun LandingScreen(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Explore 300+ artistic styles with verified camera decoding",
+                        text = "Explore 400+ artistic styles with verified camera decoding",
                         color = TextMuted,
                         fontSize = 12.sp
                     )
@@ -672,7 +897,7 @@ fun LandingScreen(
                         .border(1.dp, CardBorder, RoundedCornerShape(8.dp))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
-                    Text("335 Styles", color = EmeraldGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("400+ Styles", color = EmeraldGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -807,6 +1032,7 @@ fun LandingScreen(
 
         val faqs = listOf(
             Pair("Is QRWho really 100% free with no watermarks?", "Yes. QRWho is completely free forever. We generate full-resolution 2048px PNG and print-ready files with zero watermarks, zero accounts, and zero paywalls."),
+            Pair("Can I use QRWho on the web or desktop?", "Yes! Visit our official website at qrwho.online to create, style, and download camera-grade designer QR codes in your desktop or mobile browser with zero installation."),
             Pair("Do QR codes created on QRWho ever expire?", "Never. QRWho creates standard static QR codes where your URL, text, or WiFi credentials are encoded directly into the pixel matrix. There is no middleman redirect server, so your codes will work for decades even if offline."),
             Pair("Are my uploaded photos and links private?", "100% private. All rendering, image processing, encoding, and camera verification happens entirely inside your local memory using client-side algorithms. Your files never touch any external server."),
             Pair("How does the active scannability checker and Auto-Fix work?", "As you tweak colors, shapes, and images, our background engine decodes the exact raster bitmap using camera-grade computer vision algorithms. If contrast or geometry drops below reliable scan thresholds, the Wand 'Fix Scan' button instantly calculates the nearest high-contrast scannable parameter set."),
@@ -894,7 +1120,7 @@ fun LandingScreen(
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Support Us on Ko-fi ☕", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text("Support Us on Ko-fi", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
             }
         }
@@ -926,7 +1152,62 @@ fun LandingScreen(
                 fontSize = 11.sp,
                 textAlign = TextAlign.Center
             )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Website Link Button in Footer
+            Surface(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .border(1.dp, ElectricCyan.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                    .clickable {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://qrwho.online"))
+                            context.startActivity(intent)
+                        } catch (_: Exception) {}
+                    }
+                    .testTag("footer_website_link_button"),
+                color = ElectricCyan.copy(alpha = 0.10f)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Language,
+                        contentDescription = "Website",
+                        tint = ElectricCyan,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Official Website: qrwho.online",
+                        color = ElectricCyan,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                        contentDescription = null,
+                        tint = ElectricCyan,
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(10.dp))
+
+            // Settings & About Button in Footer
+            androidx.compose.material3.TextButton(
+                onClick = { onOpenSettings?.invoke() },
+                modifier = Modifier.testTag("footer_open_settings_button")
+            ) {
+                Icon(Icons.Default.Settings, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Settings & About QRWho", color = TextSecondary, fontSize = 11.5.sp, fontWeight = FontWeight.Medium)
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "© 2026 QRWho Studio · ISO/IEC 18004 Standard · High Error Correction",
                 color = TextMuted,
@@ -935,6 +1216,13 @@ fun LandingScreen(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+    }
+
+    if (showGuideModal) {
+        com.example.ui.components.QrGuideModalDialog(
+            onDismiss = { showGuideModal = false },
+            onLaunchStudio = onNavigateToStudio
+        )
     }
 }
 
