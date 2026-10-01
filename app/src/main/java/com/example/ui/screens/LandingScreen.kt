@@ -485,13 +485,13 @@ fun LandingScreen(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Supporters Hall of Fame Banner
+                // Supporters Hall of Fame Banner (Compact)
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFFFFB800).copy(alpha = 0.12f))
-                        .border(1.dp, Color(0xFFFFB800).copy(alpha = 0.55f), RoundedCornerShape(14.dp))
+                        .background(Color(0xFFFFB800).copy(alpha = 0.09f))
+                        .border(1.dp, Color(0xFFFFB800).copy(alpha = 0.45f), RoundedCornerShape(14.dp))
                         .clickable {
                             try {
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.qrwho.online/hall-of-fame"))
@@ -501,70 +501,64 @@ fun LandingScreen(
                         .testTag("hero_hall_of_fame_button"),
                     color = Color.Transparent
                 ) {
-                    Column(
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(14.dp)
+                            .padding(horizontal = 14.dp, vertical = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.weight(1f).padding(end = 8.dp)
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(34.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFFFFB800).copy(alpha = 0.22f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.EmojiEvents,
-                                        contentDescription = "Hall of Fame",
-                                        tint = Color(0xFFFFB800),
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column {
-                                    Text(
-                                        text = "Supporters Hall of Fame 🏆",
-                                        color = TextPrimary,
-                                        fontSize = 13.5.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = "https://www.qrwho.online/hall-of-fame",
-                                        color = Color(0xFFFFC107),
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFFFB800).copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.EmojiEvents,
+                                    contentDescription = "Hall of Fame",
+                                    tint = Color(0xFFFFB800),
+                                    modifier = Modifier.size(16.dp)
+                                )
                             }
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
                                 Text(
-                                    text = "Visit Hall",
-                                    color = Color(0xFFFFB800),
-                                    fontSize = 11.5.sp,
+                                    text = "Supporters Hall of Fame 🏆",
+                                    color = TextPrimary,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                                    contentDescription = null,
-                                    tint = Color(0xFFFFB800),
-                                    modifier = Modifier.size(14.dp)
+                                Text(
+                                    text = "qrwho.online/hall-of-fame",
+                                    color = Color(0xFFFFB800),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "To everyone supporting QRWho via Ko-fi: your names and support are immortalized in the Supporters Hall of Fame on our official website!",
-                            color = TextSecondary,
-                            fontSize = 11.sp,
-                            lineHeight = 15.sp
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Visit",
+                                color = Color(0xFFFFB800),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                                contentDescription = null,
+                                tint = Color(0xFFFFB800),
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
                     }
                 }
 
