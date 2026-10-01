@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.OpenInNew
@@ -90,6 +91,7 @@ fun KofiSupportModalDialog(
     onSupportClick: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
@@ -216,7 +218,7 @@ fun KofiSupportModalDialog(
 
                     // Emotional Hook Description
                     Text(
-                        text = "Your QR code is exported & ready! We craft 100% free, private, high-density artistic QR codes with zero subscriptions, ads, or paywalls.\n\nIf QRWho brought your design to life, please consider buying us a coffee on Ko-fi to help us keep innovating!",
+                        text = "Your QR code is exported & ready! We craft 100% free, private, high-density artistic QR codes with zero subscriptions or paywalls.\n\nSupport us on Ko-fi to help us keep innovating — your name will be honored in our Supporters Hall of Fame at qrwho.online!",
                         color = TextSecondary,
                         fontSize = 12.sp,
                         textAlign = TextAlign.Center,
@@ -276,6 +278,35 @@ fun KofiSupportModalDialog(
                                 imageVector = Icons.Default.OpenInNew,
                                 contentDescription = null,
                                 modifier = Modifier.size(14.dp)
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                try {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.qrwho.online/hall-of-fame"))
+                                    context.startActivity(intent)
+                                } catch (_: Exception) {}
+                            },
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFB800).copy(alpha = 0.6f)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(42.dp)
+                                .testTag("kofi_modal_hall_of_fame_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.EmojiEvents,
+                                contentDescription = null,
+                                tint = Color(0xFFFFB800),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "View Supporters Hall of Fame 🏆",
+                                color = Color(0xFFFFB800),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.5.sp
                             )
                         }
 

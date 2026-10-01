@@ -208,12 +208,18 @@ fun QrGuideModalDialog(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 280.dp, max = 440.dp)
+                            .weight(1f, fill = false)
+                            .heightIn(max = 480.dp)
                             .verticalScroll(rememberScrollState())
                             .padding(vertical = 2.dp)
                     ) {
                         when (selectedTab) {
-                            0 -> FunctionsGuideContent()
+                            0 -> FunctionsGuideContent(
+                                onLaunchStudio = {
+                                    onDismiss()
+                                    onLaunchStudio()
+                                }
+                            )
                             1 -> ScannabilityRulesContent()
                             2 -> ProTipsContent()
                         }
@@ -288,8 +294,67 @@ fun QrGuideModalDialog(
 }
 
 @Composable
-private fun FunctionsGuideContent() {
+private fun FunctionsGuideContent(
+    onLaunchStudio: () -> Unit = {}
+) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Quick Action Banner inside Guide
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .border(1.dp, ElectricCyan.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
+                .clickable { onLaunchStudio() }
+                .testTag("guide_functions_tab_launch_studio_card"),
+            color = ElectricCyan.copy(alpha = 0.12f)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f).padding(end = 8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = null,
+                        tint = ElectricCyan,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "Ready to Create?",
+                            color = TextPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Tap here to open the Studio & customize your QR code",
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = ElectricCyan,
+                    modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                ) {
+                    Text(
+                        text = "Open Studio 🚀",
+                        color = Color(0xFF0F172A),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
+            }
+        }
         GuideFeatureCard(
             icon = Icons.Default.Tune,
             iconTint = ElectricCyan,

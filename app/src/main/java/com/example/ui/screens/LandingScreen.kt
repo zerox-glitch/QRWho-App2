@@ -53,6 +53,7 @@ import androidx.compose.material.icons.filled.VolunteerActivism
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
@@ -175,7 +176,7 @@ fun LandingScreen(
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 // 1. Guide Button
                 Surface(
@@ -188,7 +189,7 @@ fun LandingScreen(
                     color = SurfaceDark
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -197,11 +198,11 @@ fun LandingScreen(
                             tint = ElectricCyan,
                             modifier = Modifier.size(12.dp)
                         )
-                        Spacer(modifier = Modifier.width(3.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "Guide",
                             color = ElectricCyan,
-                            fontSize = 10.5.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             softWrap = false
@@ -209,27 +210,7 @@ fun LandingScreen(
                     }
                 }
 
-                // 2. Settings Button
-                Surface(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clip(CircleShape)
-                        .border(1.dp, CardBorder, CircleShape)
-                        .clickable { onOpenSettings?.invoke() }
-                        .testTag("landing_settings_button"),
-                    color = SurfaceDark
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = TextSecondary,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                }
-
-                // 3. Support Button
+                // 2. Support Button
                 Surface(
                     modifier = Modifier
                         .height(30.dp)
@@ -245,7 +226,7 @@ fun LandingScreen(
                     color = Color(0xFFFF5E5B)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -499,6 +480,91 @@ fun LandingScreen(
                                 modifier = Modifier.size(14.dp)
                             )
                         }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Supporters Hall of Fame Banner
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFFFFB800).copy(alpha = 0.12f))
+                        .border(1.dp, Color(0xFFFFB800).copy(alpha = 0.55f), RoundedCornerShape(14.dp))
+                        .clickable {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.qrwho.online/hall-of-fame"))
+                                context.startActivity(intent)
+                            } catch (_: Exception) {}
+                        }
+                        .testTag("hero_hall_of_fame_button"),
+                    color = Color.Transparent
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFFFB800).copy(alpha = 0.22f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.EmojiEvents,
+                                        contentDescription = "Hall of Fame",
+                                        tint = Color(0xFFFFB800),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = "Supporters Hall of Fame 🏆",
+                                        color = TextPrimary,
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "https://www.qrwho.online/hall-of-fame",
+                                        color = Color(0xFFFFC107),
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Visit Hall",
+                                    color = Color(0xFFFFB800),
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFFB800),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "To everyone supporting QRWho via Ko-fi: your names and support are immortalized in the Supporters Hall of Fame on our official website!",
+                            color = TextSecondary,
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp
+                        )
                     }
                 }
 
@@ -1088,7 +1154,7 @@ fun LandingScreen(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = "QRWho is built with love—100% free, private, and watermark-free forever. If QRWho helped you build amazing artistic QR codes, consider supporting us on Ko-fi!",
+                    text = "QRWho is built with love—100% free, private, and watermark-free forever. Support us on Ko-fi and your name will be honored in our Supporters Hall of Fame on our website!",
                     color = TextSecondary,
                     fontSize = 12.sp,
                     textAlign = TextAlign.Center,
@@ -1097,30 +1163,59 @@ fun LandingScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                Button(
-                    onClick = {
-                        try {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/qrwho"))
-                            context.startActivity(intent)
-                        } catch (e: Exception) {}
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = com.example.ui.components.KofiRed,
-                        contentColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier
-                        .fillMaxWidth(0.9f)
-                        .height(44.dp)
-                        .testTag("landing_bottom_kofi_button")
+                Row(
+                    modifier = Modifier.fillMaxWidth(0.98f),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.LocalCafe,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Support Us on Ko-fi", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Button(
+                        onClick = {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/qrwho"))
+                                context.startActivity(intent)
+                            } catch (_: Exception) {}
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = com.example.ui.components.KofiRed,
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp)
+                            .testTag("landing_bottom_kofi_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocalCafe,
+                            contentDescription = null,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text("Support Ko-fi", fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.qrwho.online/hall-of-fame"))
+                                context.startActivity(intent)
+                            } catch (_: Exception) {}
+                        },
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFB800).copy(alpha = 0.6f)),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp)
+                            .testTag("landing_bottom_hall_of_fame_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.EmojiEvents,
+                            contentDescription = null,
+                            tint = Color(0xFFFFB800),
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text("Hall of Fame", color = Color(0xFFFFB800), fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
+                    }
                 }
             }
         }
@@ -1154,44 +1249,89 @@ fun LandingScreen(
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Website Link Button in Footer
-            Surface(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .border(1.dp, ElectricCyan.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
-                    .clickable {
-                        try {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://qrwho.online"))
-                            context.startActivity(intent)
-                        } catch (_: Exception) {}
-                    }
-                    .testTag("footer_website_link_button"),
-                color = ElectricCyan.copy(alpha = 0.10f)
+            // Website Link & Hall of Fame Buttons in Footer
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Surface(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(1.dp, ElectricCyan.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                        .clickable {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://qrwho.online"))
+                                context.startActivity(intent)
+                            } catch (_: Exception) {}
+                        }
+                        .testTag("footer_website_link_button"),
+                    color = ElectricCyan.copy(alpha = 0.10f)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Language,
-                        contentDescription = "Website",
-                        tint = ElectricCyan,
-                        modifier = Modifier.size(15.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Official Website: qrwho.online",
-                        color = ElectricCyan,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                        contentDescription = null,
-                        tint = ElectricCyan,
-                        modifier = Modifier.size(13.dp)
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Language,
+                            contentDescription = "Website",
+                            tint = ElectricCyan,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "qrwho.online",
+                            color = ElectricCyan,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                            contentDescription = null,
+                            tint = ElectricCyan,
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(1.dp, Color(0xFFFFB800).copy(alpha = 0.45f), RoundedCornerShape(12.dp))
+                        .clickable {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.qrwho.online/hall-of-fame"))
+                                context.startActivity(intent)
+                            } catch (_: Exception) {}
+                        }
+                        .testTag("footer_hall_of_fame_button"),
+                    color = Color(0xFFFFB800).copy(alpha = 0.10f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.EmojiEvents,
+                            contentDescription = "Hall of Fame",
+                            tint = Color(0xFFFFB800),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Hall of Fame 🏆",
+                            color = Color(0xFFFFB800),
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                            contentDescription = null,
+                            tint = Color(0xFFFFB800),
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
                 }
             }
 
